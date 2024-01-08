@@ -1,0 +1,547 @@
+---
+title: "Multiple Regression Assumptions and Diagnostics"
+subtitle: "Statistics for Data Science II"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  revealjs:
+    theme: uwf2
+    embed-resources: true
+    slide-number: false
+    width: 1600
+    height: 900
+    df-print: paged
+    html-math-method: katex
+title-slide-attributes:
+    data-background-image: /Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/title.png
+    data-background-size: contain 
+editor: source
+pdf-separate-fragments: true
+fig-align: center
+---
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let us now review the "checks" we will perform on our models.
+
+    - Model assumptions
+    
+    - Outliers
+    
+    - Influence
+    
+    - Leverage
+    
+    - Multicollinearity
+    
+```{r} 
+#| echo: false 
+# remove once Ihsan has the package updated
+cooks <- function(fitted.lm, label = TRUE, show.threshold = FALSE, threshold = "convention", scale.factor = 0.5) {
+ 
+  # obtain linear model matrix
+  lm_matrix <- fortify(fitted.lm)
+  lm_matrix[, "rowname"] <- 1:nrow(lm_matrix)
+ 
+  # threshold for outlier
+  cooksd = lm_matrix[, ".cooksd"]
+  n = nrow(lm_matrix)
+ 
+  # compute the threshold value for cook's distance plot
+  if (threshold == "matlab") {
+    threshold = mean(cooksd) * 3
+  }
+  else if (threshold == "baseR") {
+    threshold = c(0.5, 1)
+  }
+  else if (threshold == "convention") {
+    threshold = c(4/n, 1)
+  }
+  else {
+    stop("invalid threshold specified for gg_cooksd")
+  }
+ 
+  # window limit
+  limit = max(cooksd, na.rm = T)
+  margin_factor = 5
+  margin = round(limit / margin_factor)
+  max_cook = limit + margin
+ 
+  .cooksd <- NULL
+ 
+  base_plot <- (ggplot(fitted.lm, aes(1:nrow(lm_matrix), .cooksd, ymin = 0, ymax = cooksd)) +
+                  geom_point(size = scale.factor) +
+                  geom_linerange(size = scale.factor) +
+                  xlab("Observation Number") +
+                  ylab("Cook's Distance") +
+                  ylim(0, max_cook+0.05)) +
+                  theme_bw()
+ 
+  # labelling of potential outliers
+  if (label) {
+    out_inds <- which(cooksd < min(threshold))
+    lm_matrix[out_inds, "rowname"] <- rep("", length(out_inds))
+    base_plot = base_plot + geom_text(label = lm_matrix[, "rowname"], nudge_y = 0.05, color = "black")
+  }
+ 
+  return(base_plot)
+}
+```
+
+## Model Assumptions {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Recall the glm, $$ y = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + ... \beta_k x_k + \varepsilon $$ where $\varepsilon$ is the residual error term.
+
+- Recall that the residual error is defined as $$\varepsilon = y - \hat{y}$$ where 
+
+    - $y$ is the observed value
+    
+    - $\hat{y}$ is the predicted value
+
+- The residual tells us how far away the observation is from the response surface (the predicted value).
+
+- Ordinary least squares estimation means that we have minimized the overall error.
+    
+## Model Assumptions {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Recall the regression (and ANOVA) assumptions, 
+
+$$\varepsilon \overset{\text{iid}}{\sim} N(0, \sigma^2)$$
+
+- **The assumptions are on the residual!**
+
+- What this means:
+
+    - Residuals are normally distributed
+    
+    - Distribution of residuals is centered at 0
+    
+    - Variance of residuals is some constant $\sigma^2$
+
+## Model Assumptions {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We will assess the assumptions graphically.
+
+    - Constant variance: scatterplot
+    
+    - Normal distribution: q-q plot
+    
+- A package was written by a former student, [`classpackage`](https://github.com/ieb2/class_package).
+
+    - If you **are** working on the server, the package is already installed.
+
+    - If you are **not** working on the server, you need to install the package:
+    
+```{r}
+#| eval: false
+# install.packages("devtools") - use this if R tells you it can't find install_github()
+library(devtools)
+install_github("ieb2/class_package", force = TRUE)
+```
+
+## Model Assumptions {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Once installed, we call the package,
+
+```{r}
+library(classpackage)
+```
+
+- While there are several functions in this package, we are interested in the `anova_check()` function.
+
+```{r}
+#| eval: false
+m <- glm(y ~ x1 + x2 + ..., data = dataset)
+anova_check(m)
+```
+
+- This will provide the scatterplot and the q-q plot.
+
+## Data about Bee Colonies {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let us consider [data regarding honey bees in the United States](https://github.com/rfordatascience/tidytuesday/blob/master/data/2022/2022-01-11/readme.md), provided by [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday/tree/master).
+
+::: {.panel-tabset}
+
+## Data
+
+```{r}
+#| echo: false
+library(tidyverse)
+library(fastDummies)
+colony <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-11/colony.csv') %>%
+  mutate(quarter = case_when(months == "January-March" ~ "Q1", 
+                             months == "April-June" ~ "Q2",
+                             months == "July-September" ~ "Q3",
+                             months == "October-December" ~ "Q4")) %>%
+  dummy_cols(select_columns = c("quarter")) 
+head(colony, n=5)
+```
+
+## Check Months
+
+```{r}
+#| echo: false
+colony %>% count(months)
+```
+
+## Code
+
+```{r}
+#| eval: false
+library(tidyverse)
+library(fastDummies)
+colony <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-11/colony.csv') %>%
+  mutate(quarter = case_when(months == "January-March" ~ "Q1", 
+                             months == "April-June" ~ "Q2",
+                             months == "July-September" ~ "Q3",
+                             months == "October-December" ~ "Q4")) %>%
+  dummy_cols(select_columns = c("quarter")) %>%
+  select(quarter, year, state, colony_lost, quarter_Q1, quarter_Q2, quarter_Q3, quarter_Q4, colony_max)
+head(colony, n=5)
+```
+
+:::
+
+
+## Model Assumptions {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Further, recall the model we constructed,
+
+```{r}
+m1 <- glm(colony_lost ~ quarter_Q1 + quarter_Q2 + quarter_Q3 + year + colony_max, data = colony)
+summary(m1)
+```
+
+## Model Assumptions {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Now, let's check the assumptions on the model,
+
+<center>
+```{r}
+library(classpackage)
+anova_check(m1)
+```
+</center>
+
+## Model Fit: $R^2$ {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- If we want to know how well the model fits the particular dataset at hand, we can look at the $R^2$.
+
+    - $R^2$ is the proportion of variance explained by the model.
+  
+    - Because it is a proportion, $R^2 \in [0, 1]$ and is independent of the units of $y$.
+
+- If $R^2 \to 0$, the model does not fit the data well; if $R^2 \to 1$, the model fits the data well.
+
+    - Note that if $R^2=1$, all observations fall on the response surface.
+
+$$ R^2 = \frac{\text{SSReg}}{\text{SSTot}} $$
+
+## Model Fit: $R^2$ {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Remember that we are partitioning the variability in $y$ (SSTot), which is *constant*, into two pieces:
+
+    - The variability explained by the regression model (SSReg).
+  
+    - The variability explained by outside sources (SSE).
+
+- As predictors are added to the model, we necessarily increase SSReg / decrease SSE.
+
+- We want a measure of model fit that is resistant to this fluctuation, $$R^2_{\text{adj}} = 1 - \left( \frac{n-1}{n-k-1} \right) \left( 1 - R^2 \right),$$ where $k$ is the number of predictor terms in the model.
+
+## Model Fit: $R^2$ {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We will use the `adjR2()` function from the `glmtoolbox` package to find $R^2_{\text{adj}}$.
+
+- In our example,
+
+```{r}
+library(glmtoolbox)
+(adjR2(m1))
+```
+
+## Model Diagnostics: Outliers {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Definition: data values that are much larger or smaller than the rest of the values in the dataset.
+
+- We will look at the standardized residuals, $$ e_{i_{\text{standardized}}} = \frac{e_i}{\sqrt{\text{MSE}(1-h_i)}}, $$ where
+
+    - $e_i = y_i - \hat{y}_i$ is the residual of the $i$^th^ observation
+    - $h_i$ is the leverage of the $i$^th^ observation
+    
+- If $|e_{i_{\text{standardized}}}| > 2.5 \ \to \ $ outlier.
+
+- If $|e_{i_{\text{standardized}}}| > 3 \ \to \ $ extreme outlier.
+
+## Model Diagnostics:  Outliers {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We will use the `rstandard()` function to find the residuals.
+
+- For ease of examining in large datasets, we will use it to create a "flag."
+
+```{r}
+#| eval: false
+dataset <- dataset %>%
+  mutate(outlier =  if_else(abs(rstandard(m))>2.5, "Suspected", "Not Suspected"))
+```
+
+- We can count the number of outliers,
+
+```{r}
+#| eval: false
+dataset %>% count(outlier)
+```
+
+- We can just look at outliers from the dataset,
+
+```{r}
+#| eval: false
+new_dataset <- dataset %>% 
+  filter(outlier == TRUE)
+```
+
+- We can also exclude outliers from the dataset,
+
+```{r}
+#| eval: false
+new_dataset <- dataset %>% 
+  filter(outlier == FALSE)
+```
+
+## Model Diagnostics:  Outliers {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's check for outliers in our example data,
+
+```{r}
+#| error: true
+colony <- colony %>% 
+  mutate(outlier =  if_else(abs(rstandard(m1))>2.5, "Suspected", "Not Suspected"))
+```
+
+- Oops! We have missing data, so R does not like our request.
+
+## Model Diagnostics:  Outliers {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's check for outliers in our example data,
+
+::: {.panel-tabset}
+
+## Model 1
+
+```{r}
+summary(m1)
+```
+
+## Complete Case
+
+```{r}
+#| error: true
+colony2 <- colony %>%
+  select(colony_lost, quarter_Q1, quarter_Q2, quarter_Q3, year, colony_max) %>%
+  na.omit()
+```
+
+## Model 2
+
+```{r}
+m2 <- glm(colony_lost ~ quarter_Q1 + quarter_Q2 + quarter_Q3 + year + colony_max, data = colony2)
+summary(m2)
+```
+
+## Outliers
+```{r}
+colony2 <- colony2 %>% 
+  mutate(outlier =  if_else(abs(rstandard(m2))>2.5, "Suspected", "Not Suspected"))
+head(colony2, n = 3)
+```
+
+:::
+
+## Model Diagnostics:  Outliers {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's investigate further.
+
+::: {.panel-tabset}
+
+## Count of Outliers
+
+- How many data points are outliers?
+
+```{r}
+colony2 %>% count(outlier)
+```
+
+- There are 32 outliers (as defined by the residual $\ge$ 2.5)
+
+## Graph of Outliers
+
+<center>
+```{r}
+#| echo: false
+colony2 %>% ggplot(aes(x = colony_max, y = colony_lost, color = outlier)) +
+  geom_point() + 
+  scale_color_manual(values = c("#999999", "#000000")) +
+  labs(x = "Total Colonies", y = "Colonies Lost", color = "Outlier") +
+  theme_bw()
+```
+</center>
+
+## Code for Graph
+
+```{r}
+#| eval: false
+colony2 %>% ggplot(aes(x = colony_max, y = colony_lost, color = outlier)) +
+  geom_point() + 
+  scale_color_manual(values = c("#999999", "#000000")) +
+  labs(x = "Total Colonies", y = "Colonies Lost", color = "Outlier") +
+  theme_bw()
+```
+
+:::
+
+## Model Diagnostics:  Leverage and Influential Points {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- A leverage point is defined as follows:
+
+    - A point for which $x_i$ is far from the other values. 
+
+- An influential point is defined as follows:
+
+    - A point that significantly affects the regression model. 
+
+- We check these *together* using Cook's distance.
+
+    - We will look for "spikes" in the plot.
+
+- We will use the `cooks()` function from the `classpackage` package.
+
+```{r}
+#| eval: false
+cooks(m)
+```
+
+## Model Diagnostics:  Leverage and Influential Points {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's assess leverage and influence in our example.
+
+<center>
+```{r}
+cooks(m2)
+```
+</center>
+
+- I might include observation 4 when checking.
+
+## Model Diagnostics:  Multicollinearity {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Collinearity/multicollinearity: a correlation between two or more predictor variables affects the estimation procedure.
+
+- We will use the variance inflation factor (VIF) to check for multicollinearity. $$ \text{VIF}_j = \frac{1}{1-R^2_j}, $$
+
+- where
+
+    - $j$ = the predictor of interest and $j \in \{1, 2, ..., k \}$,
+    - $R^2_j$ results from regressing $x_j$ on the remaining $(k-1)$ predictors.
+    
+- We say that multicollinearity is present if VIF > 10.
+
+- How do we deal with multicollinearity?
+
+    - Easy answer: remove at least one predictor from the collinear set, then reassess VIF.
+    
+    - More complicated: discussing with collaborators/bosses.
+    
+## Model Diagnostics:  Multicollinearity {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- We will use the [`vif()`](https://www.rdocumentation.org/packages/car/versions/3.1-0/topics/vif) function from the `car` package.
+
+```{r}
+#| eval: false
+library(car)
+vif(m)
+```
+
+- Note: the `car` package overwrites some functions from `tidyverse`, so I typically do not load the full library.
+
+- There will be a VIF value for each predictor in the model.
+
+    - Note that VIF can sometimes be high for related categorical terms.
+    
+## Model Diagnostics:  Multicollinearity {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's check the multicollinearity for our data,
+
+```{r}
+car::vif(m2)
+```
+
+- No multicollinearity is present.
+
+## Sensitivity Analysis {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- We can perform sensitivity analysis to determine how much our model changes when we exclude the outliers.
+
+    - Model 1: model using data with all observations
+    - Model 2: model using data without identified outliers
+  
+- Questions we will ask: 
+
+    - How different are the $\hat{\beta}_i$? 
+    - Did a predictor go from being significant to non-significant? (or vice-versa?)
+    - Does the direction of $\hat{\beta}_i$ change? 
+    - What is the difference in $R^2$?
+
+- We only look at sensitivity analysis **once** (i.e., only remove data points once for reanalysis).
+  
+    - If we keep going, we will whittle down the dataset to as close to a "perfect fit" as possible, introducing other issues.
+    
+## Sensitivity Analysis {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's perform sensitivity analysis on our example model.
+
+::: {.panel-tabset}
+
+## Which are Outliers?
+
+```{r}
+colony_outliers <- colony2 %>% filter(outlier == "Suspected")
+head(colony_outliers, n=5)
+```
+
+## Full Data
+
+```{r}
+m2 <- glm(colony_lost ~ quarter_Q1 + quarter_Q2 + quarter_Q3 + year + colony_max, data = colony2)
+summary(m2)
+```
+
+## Reduced Data
+
+```{r}
+colony_no_outliers <- colony2 %>% filter(outlier == "Not Suspected")
+m3 <- glm(colony_lost ~ quarter_Q1 + quarter_Q2 + quarter_Q3 + year + colony_max, data = colony_no_outliers)
+summary(m3)
+```
+
+:::
+
+## Wrap Up {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Today we have covered the basics of
+
+    - model assumptions
+    
+    - model diagnostics
+    
+    - sensitivity analysis 
+
+- Next week, we will learn about a new type of term: an interaction.
+
+    - Continuous $\times$ continuous 
+    
+    - Continuous $\times$ categorical
+    
+    - Categorical $\times$ categorical

@@ -1,0 +1,678 @@
+---
+title: "Categorical Predictors"
+subtitle: "Statistics for Data Science II"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  revealjs:
+    theme: uwf2
+    embed-resources: true
+    slide-number: false
+    width: 1600
+    height: 900
+    df-print: paged
+    html-math-method: katex
+title-slide-attributes:
+    data-background-image: /Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/title.png
+    data-background-size: contain 
+editor: source
+pdf-separate-fragments: true
+fig-align: center
+---
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Recall the general linear model, $$ y = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k + \varepsilon $$
+
+- Until now, we have discussed *continuous* predictors.
+
+- Now we will introduce the use of *categorical*, or qualitative, predictors. 
+
+- This means that we will include predictors that *categorize* the observations.
+
+    - We can assign numbers to the categories, however, the numbers are *nominal*.
+    
+## Categorical Variables {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- If there are $c$ classes in a categorical predictor, we include $c-1$ in the model. 
+
+    - e.g., undergraduate status: freshman, sophomore, junior, senior
+    
+    - e.g., AKC-recognized pug color: fawn, black
+
+- We will create *indicator* variables to include in our model.
+
+- The $c-1$ predictors included in the model will be binary indicators for category. 
+$$ x_i = \begin{cases} 
+      1 & \textnormal{if category $i$} \\
+      0 & \textnormal{if another category}
+\end{cases}$$
+
+- In the undergraduate status example, we could create four indicator variables, but we would only include three in our model.
+
+- While we will call them indicator variables, you will more often see them called dummy variables.
+
+
+## Data about Bee Colonies {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let us consider [data regarding honey bees in the United States](https://github.com/rfordatascience/tidytuesday/blob/master/data/2022/2022-01-11/readme.md), provided by [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday/tree/master).
+
+::: {.panel-tabset}
+
+## Data
+
+```{r}
+#| echo: false
+library(tidyverse)
+colony <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-11/colony.csv')
+head(colony, n=5)
+```
+
+## Check Months
+
+```{r}
+#| echo: false
+colony %>% count(months)
+```
+
+## Code
+
+```{r}
+#| eval: false
+library(tidyverse)
+colony <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-11/colony.csv')
+head(colony, n=5)
+colony %>% count(months)
+```
+
+:::
+
+## Creating Indicator Variables {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We could use `mutate()` and `if_else()` to define indicator variables.
+
+- However, if we do not need to condense categories, the `dummy_cols()` function from the `fastDummies` package works well.
+
+```{r}
+#| eval: false
+library(fastDummies)
+dataset <- dataset %>% # overwrite dataset
+  dummy_cols(select_columns = c("var1", "var2", ..., "varQ")) # add indicators for the variables listed
+```
+
+- Note that this will also create a column that indicates if the value is missing or not.
+
+    - This variable **must not** be included in the model.
+
+## Creating Indicator Variables {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's create indicator variables for the *months* variable.
+
+::: {.panel-tabset}
+
+## Code
+
+```{r}
+library(fastDummies)
+colony <- colony %>% # overwrite data
+  dummy_cols(select_columns = c("months")) # create indicators for months
+```
+
+## Check
+
+```{r}
+colony %>% 
+  select(starts_with("months")) %>% # limit output to columns related to months
+  head(n=3) # show first 3 obs
+```
+
+## Fix
+
+```{r}
+library(fastDummies)
+colony <- colony %>% # overwrite data
+  mutate(quarter = case_when(months == "January-March" ~ "Q1", # convert to quarters
+                             months == "April-June" ~ "Q2",
+                             months == "July-September" ~ "Q3",
+                             months == "October-December" ~ "Q4")) %>%
+  dummy_cols(select_columns = c("quarter")) # create indicators for quarter
+```
+
+## Check
+
+```{r}
+colony %>% 
+  select(starts_with("quarter")) %>% # limit output to columns related to months
+  head(n=3) # show first 3 obs
+```
+
+:::
+
+## Modeling with Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We represent a categorical variable with $c$ classes with $c-1$ indicator variables in a model.
+
+- The last indicator variable not included is called the *reference group*. 
+
+- How do we choose a reference group?
+
+    - It depends on the story being told / what is of interest.
+  
+    - It does not affect the usefulness of the model, only the interpretations.
+
+## Modeling with Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Suppose we are interested in modeling the number of colonies lost as a function of the year, quarter, and total number of colonies.
+
+- What happens when we do not use indicator variables?
+
+::: {.panel-tabset}
+
+## Model Results
+
+```{r}
+#| echo: false
+m1 <- glm(colony_lost ~ quarter + year + colony_max, data = colony)
+summary(m1)
+```
+
+## Code
+
+```{r}
+#| eval: false
+m1 <- glm(colony_lost ~ quarter + year + colony_max, data = colony)
+summary(m1)
+```
+
+:::
+
+## Modeling with Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We can see that R automatically treated them as categorical predictors, selecting a reference group for us.
+
+```{r}
+coefficients(m1)
+```
+
+- R uses the "first group" as the reference group.
+
+    - In this case, it sees "Q1" as the "first" group because "1" is first numerically.
+
+- It is fine to do this for "ease" - if I am doing preliminary modeling, I do not always use indicator variables.
+
+- **Warning**: If you have a column stored as *numeric*, this method <u>does not work</u>.
+
+    - R will treat it as a continuous varaible, which is not always correct.
+    
+    - User beware! Always be aware of how categorical variables are stored!
+
+## Modeling with Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Circling back to indicator variables, let's construct our model using those. 
+
+    - First, we need to see what their names are. 
+
+```{r}
+colony %>% 
+  select(starts_with("quarter")) %>% # limit output to columns related to months
+  head(n=5) # show first 3 obs
+```
+
+
+## Modeling with Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Using those variables in the model, we get the same results when Q1 is the reference.
+
+::: {.panel-tabset}
+
+## Model Results
+
+```{r}
+#| echo: false
+m2 <- glm(colony_lost ~ quarter_Q2 + quarter_Q3 + quarter_Q4 + year + colony_max, data = colony)
+summary(m2)
+```
+
+## Code
+
+```{r}
+#| eval: false
+m2 <- glm(colony_lost ~ quarter_Q2 + quarter_Q3 + quarter_Q4 + year + colony_max, data = colony)
+summary(m2)
+```
+
+:::
+
+$$\hat{y} = 427926.00 - 4057.73 x_{\text{Q2}} + 33.02 x_{\text{Q3}} - 562.15 x_{\text{Q4}} - 211.92 x_{\text{year}} + 0.12 x_{\text{tot. col.}}$$
+
+## Modeling with Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Maybe we are interested in using Q4 (the "holiday season") as the reference.
+
+::: {.panel-tabset}
+
+## Model Results
+
+```{r}
+#| echo: false
+m2 <- glm(colony_lost ~ quarter_Q1 + quarter_Q2 + quarter_Q3 + year + colony_max, data = colony)
+summary(m2)
+```
+
+## Code
+
+```{r}
+#| eval: false
+m2 <- glm(colony_lost ~ quarter_Q1 + quarter_Q2 + quarter_Q3 + year + colony_max, data = colony)
+summary(m2)
+```
+
+:::
+
+$$\hat{y} = 427363.8 + 562.16 x_{\text{Q1}} - 3495.58 x_{\text{Q2}} + 595.17 x_{\text{Q3}} - 211.92 x_{\text{year}} + 0.12 x_{\text{tot. col.}}$$
+
+## Testing Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We are interested in knowing if the overall categorical variable is a significant predictor of the outcome.
+
+    - If *c* = 2, we can use the results from `summary()`.
+    
+    - If *c* $\ge$ 3, we must request the Type III ANOVA.
+    
+        - Note: there are three types of sums of squares going into ANOVA. We are usually only interested in two:
+
+            - Type I: variables are tested in the order that they enter the model.
+            - Type III: variables are tested after adjusting for all other variables in the model.
+
+- We will use `Anova()` from the `car` package as follows:
+
+```{r}
+#| eval: false
+car::Anova(model_results, type = 3) 
+```
+
+- Note: we do not call the `car` package directly as it has conflicts with the `tidyverse` package.
+
+## Testing Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+<u>In theory</u>:
+
+- **Hypotheses**
+
+    - $H_0: \beta_{1}^* = ... = \beta_{s}^* = 0$ in the model $y = \beta_0 + \beta_1 x_1 + ... + \beta_q x_q + \beta_{1}^*x_1^* = ... = \beta_{s}^*x_s^* + \varepsilon$
+    
+    - $H_1:$ at least one $\beta_i^* \ne 0$ in the model $y = \beta_0 + \beta_1 x_1 + ... + \beta_q x_q + \beta_{1}^*x_1^* = ... = \beta_{s}^*x_s^* + \varepsilon$
+    
+- **Test Statistic and *p*-Value**
+
+    - $F_0 = \frac{\left[ \text{SSReg(full)} - \text{SSReg(reduced)} \right]/s}{\text{MSE(full)}}$ 
+    
+    - $p = P(F_{s, n-q-s} \ge F_0)$
+    
+- **Rejection Region**
+
+    - Reject $H_0$ if $p < \alpha$
+    
+## Testing Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Annotations from another lifetime:
+
+<center><img src = "images/W1-L2-a.png"></center>
+
+## Testing Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+<u>In practice</u>:
+
+- **Hypotheses**
+
+    - $H_0: \beta_{1} = \beta_{2} = ... = \beta_{c-1} = 0$ in the specified model
+    
+    - $H_1:$ at least one $\beta_i \ne 0$ in the specified model
+    
+- **Test Statistic and *p*-Value**
+
+    - $\chi^2_0$ and $p$ from `car::Anova(model_results, type = 3)`$^*$
+    
+- **Rejection Region**
+
+    - Reject $H_0$ if $p < \alpha$
+    
+$^*$ - note that the `Anova()` function produces the likelihood ratio test, which gives a $\chi^2$ statistic.
+    
+## Testing Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's look at this in our example,
+```{r}
+car::Anova(m1, type = 3)
+```
+
+- Both quarter ($p<0.001$) and total number of colonies ($p<0.001$). are significant predictors of the number of lost colonies.
+
+- The year ($p=0.052$) is not a significant predictor of the number of lost colonies.
+
+## Testing Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- **Hypotheses**
+
+    - $H_0: \beta_{\text{Q2}} = \beta_{\text{Q3}} = \beta_{\text{Q4}} = 0$ in the specified model
+    
+    - $H_1:$ at least one $\beta_i \ne 0$ in the specified model
+    
+- **Test Statistic and *p*-Value**
+
+    - $\chi^2_0 = 65.6$
+    
+    - $p < 0.001$
+    
+- **Rejection Region**
+
+    - Reject $H_0$ if $p < \alpha$; $\alpha = 0.05$
+    
+- **Conclusion/Interpretation**
+
+    - Reject $H_0.$
+    
+    - There is sufficient evidence to suggest that there is a relationship between number of bee colonies lost and the quarter of the year.
+    
+## Testing Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- **Note:** reference group does not affect *overall* significance of the term.
+
+::: {.panel-tabset}
+
+## Q1 as reference
+    
+```{r}
+m2_a <- glm(colony_lost ~ quarter + year + colony_max, data = colony)
+car::Anova(m2_a, type = 3)
+```    
+
+## Q4 as reference
+
+```{r}
+m2_b <- glm(colony_lost ~ quarter + year + colony_max, data = colony)
+car::Anova(m2_b, type = 3)
+```  
+
+:::
+
+## Interpreting Coefficients {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Interpretations of categorical predictors are slightly different than continuous predictors.
+
+    - For continuous variables, we interpret in terms of a 1-unit increase in $x_i$.
+    
+    - What is a "1-unit" increase of an indicator variable?
+    
+        - Going from $x_i=0$ to $x_i=1$
+        
+- $\beta_i$ for a categorical variable is the *average difference between groups $x_i=0$ and $x_i=1$*.
+
+    - Suppose $\hat{\beta}=-10$ when modeling systolic blood pressure as a function of high school graduation (yes=1, no=0).
+    
+    - Those that are high school graduates ($x=1$, group of interest) have a systolic blood pressure 10 mmHg lower than those that did not graduate high school ($x=0$, reference group).
+
+## Interpreting Coefficients {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- In our example,
+
+::: {.panel-tabset}
+
+## Q1 as reference
+
+$$\hat{y} = 427926.00 - 4057.73 x_{\text{Q2}} + 33.02 x_{\text{Q3}} - 562.15 x_{\text{Q4}} - 211.92 x_{\text{year}} + 0.12 x_{\text{tot. col.}}$$
+
+- There are 4058 fewer colonies lost in Q2 as compared to Q1.
+
+- There are 33 more colonies lost in Q3 as compared to Q1.
+
+- There are 562 fewer colonies lost in Q4 as compared to Q1.
+
+- For every year increase in time, 212 fewer colonies are lost.
+
+- For every 1 colony increase in the total number of colonies, 1/10 of a colony is expected to be lost.
+
+## Q4 as reference
+
+$$\hat{y} = 427363.8 + 562.16 x_{\text{Q1}} - 3495.58 x_{\text{Q2}} + 595.17 x_{\text{Q3}} - 211.92 x_{\text{year}} + 0.12 x_{\text{tot. col.}}$$
+
+- There are 562 more colonies lost in Q1 as compared to Q4. 
+
+- There are 3496 fewer colonies lost in Q2 as compared to Q4.
+
+- There are 595 more colonies lost in Q3 as compared to Q4.
+
+- For every year increase in time, 212 fewer colonies are lost.
+
+- For every 1 colony increase in the total number of colonies, 1/10 of a colony is expected to be lost.
+
+:::
+
+## Testing Categorical Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Now that we understand how to interpret, let's revisit testing.
+
+- We've already discussed testing the overall significance of the term - this is called *global* significance.
+
+- Now, let's focus on the individual terms.
+
+    - This information comes from `summary()`.
+    
+- The individual tests tell us if there is a significant *difference* between the group of interest and the reference group.
+
+    - e.g., if modeling systolic blood pressure as a function of high school education, we would be testing the difference in systolic blood pressure between those that did and did not graduate high school.
+    
+- We are not always interested in the individual tests... 
+
+    - Sometimes we are interested in multiple tests...
+
+- **Note:** This is essentially post-hoc testing. We should *adjust* our $\alpha$!
+
+    - I like to take the Bonferroni approach: $\alpha_\text{B} = \alpha/k$.
+
+## Visualizing the Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## General Guidelines
+
+- Visualization of the model is more of an art than a science... but I still have guidelines.
+
+- The generic visualization for a model is to have a scatterplot of the data with a regression line (or multiple lines) overlaid.
+
+- Note that the outcome ($y$) will always be specified on the $y$-axis.
+
+- We will decide on a continuous predictor (one $x_i$) to vary on the $x$-axis.
+
+- Then we will create predicted values by holding all other variables in the model constant.
+
+## Example
+
+- An example from the [`palmerpenguins` package](https://allisonhorst.github.io/palmerpenguins/):
+
+<center><img src="images/W1-L2-b.png" width=625></center>
+
+:::
+
+## Visualizing the Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Recall our example, 
+
+$$\hat{y} = 427926.00 - 4057.73 x_{\text{Q2}} + 33.02 x_{\text{Q3}} - 562.15 x_{\text{Q4}} - 211.92 x_{\text{year}} + 0.12 x_{\text{tot. col.}}$$
+
+- We will let *year* vary - this will show us what happens over time.
+    
+- We will create a line for each quarter.
+    
+    - Q1: $x_{\text{Q2}}=0$, $x_{\text{Q3}}=0$, $x_{\text{Q4}}=0$
+    - Q2: $x_{\text{Q2}}=1$, $x_{\text{Q3}}=0$, $x_{\text{Q4}}=0$
+    - Q3: $x_{\text{Q2}}=0$, $x_{\text{Q3}}=1$, $x_{\text{Q4}}=0$
+    - Q4: $x_{\text{Q2}}=0$, $x_{\text{Q3}}=0$, $x_{\text{Q4}}=1$
+    
+- We will plug in the median number of total colonies.
+
+```{r}
+median(colony$colony_max, na.rm = TRUE)
+```
+
+## Visualizing the Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+$$\hat{y} = 427926.00 - 4057.73 x_{\text{Q2}} + 33.02 x_{\text{Q3}} - 562.15 x_{\text{Q4}} - 211.92 x_{\text{year}} + 0.12 x_{\text{tot. col.}}$$
+
+- Putting this into `mutate()`,
+
+::: {.panel-tabset}
+
+## Code
+
+```{r}
+# base:  427926.00 - 4057.73*x_Q2 + 33.02*x_Q3 - 562.15*x_Q4 - 211.92*year + 0.12*21000
+
+colony <- colony %>%
+  mutate(p_q1 = 427926.00 - 4057.73*0 + 33.02*0 - 562.15*0 - 211.92*year + 0.12*21000,
+         p_q2 = 427926.00 - 4057.73*1 + 33.02*0 - 562.15*0 - 211.92*year + 0.12*21000,
+         p_q3 = 427926.00 - 4057.73*0 + 33.02*1 - 562.15*0 - 211.92*year + 0.12*21000,
+         p_q4 = 427926.00 - 4057.73*0 + 33.02*0 - 562.15*1 - 211.92*year + 0.12*21000)
+```
+
+## Check
+
+```{r}
+#| echo: false
+colony %>%
+  select(quarter_Q2, quarter_Q3, quarter_Q4, year, p_q1, p_q2, p_q3, p_q4) %>%
+  head(n=5)
+```
+
+:::
+
+## Visualizing the Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Note that I never construct the "final" graph on the first try - it always takes multiple edits/tweaks
+
+::: {.panel-tabset}
+
+## V1 Code
+
+```{r}
+#| warning: false
+#| eval: false
+colony %>% 
+  ggplot(aes(x = year, y = colony_lost)) +
+  geom_point() +
+  geom_line(aes(y = p_q1), color = "red") +
+  geom_line(aes(y = p_q4), color = "orange") +
+  theme_bw()
+```
+
+## V1 Graph
+
+<center>
+
+```{r}
+#| warning: false
+#| echo: false
+colony %>% 
+  ggplot(aes(x = year, y = colony_lost)) +
+  geom_point() +
+  geom_line(aes(y = p_q1), color = "red") +
+  geom_line(aes(y = p_q4), color = "orange") +
+  theme_bw()
+```
+
+</center>
+
+## V2 Code 
+
+```{r}
+#| warning: false
+#| eval: false
+colony %>% 
+  filter(colony_lost < 5000) %>%
+  ggplot(aes(x = year, y = colony_lost)) +
+  geom_point() +
+  geom_line(aes(y = p_q1), color = "red") +
+  geom_line(aes(y = p_q4), color = "orange") +
+  theme_bw()
+```
+
+## V2 Graph 
+
+<center>
+
+```{r}
+#| warning: false
+#| echo: false
+colony %>% 
+  filter(colony_lost < 5000) %>%
+  ggplot(aes(x = year, y = colony_lost)) +
+  geom_point() +
+  geom_line(aes(y = p_q1), color = "red") +
+  geom_line(aes(y = p_q4), color = "orange") +
+  theme_bw()
+```
+
+</center>
+
+
+## V3 Code 
+
+```{r}
+#| warning: false
+#| eval: false
+colony %>% 
+  filter(colony_lost < 5000) %>%
+  ggplot(aes(x = year, y = colony_lost)) +
+  geom_point(color = "gray") +
+  geom_line(aes(x = year, y = p_q1), color = "black", linetype = "dashed", size = 1) +
+  annotate("text", x = 2021.2, y = 2175, label = "Q1", size=5) +
+  geom_line(aes(x = year, y = p_q4), color = "black", linetype = "dotted", size = 1) +
+  annotate("text", x = 2021.2, y = 1600, label = "Q4", size=5) +
+  scale_x_continuous(breaks = 2015:2021,
+    labels = paste0(c("2015", "2016", "2017", "2018", "2019", "2020", "2021"), "")) +
+  labs(y = "Number of Colonies Lost",
+       x = "Year") +
+  theme_bw()
+```
+
+## V3 Graph 
+
+<center>
+
+```{r}
+#| warning: false
+#| echo: false
+colony %>% 
+  filter(colony_lost < 5000) %>%
+  ggplot(aes(x = year, y = colony_lost)) +
+  geom_point(color = "gray") +
+  geom_line(aes(x = year, y = p_q1), color = "black", linetype = "dashed", size = 1) +
+  annotate("text", x = 2021.2, y = 2175, label = "Q1", size=5) +
+  geom_line(aes(x = year, y = p_q4), color = "black", linetype = "dotted", size = 1) +
+  annotate("text", x = 2021.2, y = 1600, label = "Q4", size=5) +
+  scale_x_continuous(breaks = 2015:2021,
+    labels = paste0(c("2015", "2016", "2017", "2018", "2019", "2020", "2021"), "")) +
+  labs(y = "Number of Colonies Lost",
+       x = "Year") +
+  theme_bw()
+```
+
+</center>
+
+:::
+
+## Wrap Up {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- In this lecture, we have introduced the concept of categorical predictors.
+
+    - Always remember that if there are *c* categories, there will be *c*-1 predictor terms in the model.
+    
+    - When *c* = 2, we can use the test results from `summary()` to discuss significance.
+    
+    - When *c* $\ge$ 3, we *must* use a partial *F* test (i.e., `car::Anova()`)
+    
+    - When including for visualization, must plug in 0's and 1's - no means, medians, etc.! 
+    
+        - We plug in *only* plausible values.

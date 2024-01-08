@@ -1,0 +1,719 @@
+---
+title: "Multiple Linear Regression"
+subtitle: "Statistics for Data Science II"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  revealjs:
+    theme: uwf2
+    embed-resources: true
+    slide-number: false
+    width: 1600
+    height: 900
+    df-print: paged
+    html-math-method: katex
+title-slide-attributes:
+    data-background-image: /Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/title.png
+    data-background-size: contain 
+editor: source
+pdf-separate-fragments: true
+fig-align: center
+---
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Recall the general linear model, $$ y = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k $$
+
+- This is a multiple regression model because it has multiple predictors ($x_i$).
+
+    - A special case is simple linear regression, when there is a single predictor. $$y = \beta_0 + \beta_1 x_1 $$
+
+- $\beta_0$ is the $y$-intercept, or the average outcome ($y$) when all $x_i = 0$.
+
+- $\beta_i$ is the slope for predictor $i$ and describes the relationship between the predictor and the outcome, after adjusting (or accounting) for the other predictors in the model.
+
+## Data from The Office {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let us consider [data from the US version of The Office](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-03-17/readme.md) provided by [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday/tree/master), but originally available from the [Schrute package](https://bradlindblad.github.io/schrute/index.html).
+
+::: {.panel-tabset}
+
+## Data
+
+```{r}
+#| echo: false
+
+library(tidyverse)
+office_ratings <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-17/office_ratings.csv')
+head(office_ratings, n=5)
+```
+
+## Code
+
+```{r}
+#| eval: false
+#| 
+library(tidyverse)
+office_ratings <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-17/office_ratings.csv')
+head(office_ratings, n=5)
+```
+
+:::
+  
+## Constructing the Model in R {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- We can use the `glm()` function,
+
+```{r}
+#| eval: false
+m <- glm([outcome] ~ [pred1] + [pred2] + [pred3] + ..., 
+         data = [dataset],
+         family = "gaussian")
+```
+
+- Then we run the model results through the `summary()` function to obtain information about the model,
+
+```{r}
+#| eval: false
+summary(m)
+```
+
+- Note - we can also use the `lm()` function to construct the linear model,
+
+```{r}
+#| eval: false
+m <- lm([outcome] ~ [pred1] + [pred2] + [pred3] + ..., 
+        data = [dataset])
+```
+
+- I prefer that we stick with `glm()` for reasons that will make sense in the future.
+
+## Constructing the Model in R {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's model the IMDB rating as a function of season and episode number.
+    
+::: {.panel-tabset}
+
+## `glm()` Output
+
+```{r}
+#| echo: false
+m1 <- glm(imdb_rating ~ season + episode, 
+         data = office_ratings,
+         family = "gaussian")
+summary(m1)
+```
+
+## `glm()` Code
+
+```{r}
+#| eval: false
+m1 <- glm(imdb_rating ~ season + episode, 
+         data = office_ratings,
+         family = "gaussian")
+summary(m1)
+```
+
+## `lm()` Output
+
+```{r}
+#| echo: false
+m2 <- lm(imdb_rating ~ season + episode, 
+         data = office_ratings)
+summary(m2)
+```
+
+## `lm()` Code
+
+```{r}
+#| eval: false
+m2 <- lm(imdb_rating ~ season + episode, 
+         data = office_ratings)
+summary(m2)
+```
+
+:::
+
+## Stating the Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Using the resulting coefficients, we can state the model.
+
+```{r}
+coefficients(m1)
+```
+
+- Thus, the resulting model is $$\hat{y} = 8.61 - 0.09 x_1 + 0.01 x_2,$$ where 
+
+    - $y$ is the IMDB rating,
+    
+    - $x_1$ is the season number, and
+    
+    - $x_2$ is the episode number.
+    
+## Stating the Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Using the stated coefficients, we can state the model.
+
+```{r}
+coefficients(m2)
+```    
+
+- Instead of using $y$ and $x_i$, we can state it this way: $$\hat{\text{rating}} = 8.61 - 0.09 \text{ season} + 0.01 \text{ episode}$$
+
+- I prefer using this method when explaining models to collaborators.
+
+- For homework/projects, I do not care which method you use.
+
+    - If you use $y$ and $x_i$, you must define them in context of the dataset.
+
+## Interpretation of Slope {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- We want to put the slope into perspective for whoever we are collaborating with.
+
+- Basic interpretation: for every 1 [units of $x_i$] increase in [$x_i$], [$y$] [increases or decreases] by $\left[ \left| \hat{\beta}_i \right| \right]$ [units of $y$].
+
+    - We say that $y$ is decreasing if $\hat{\beta}_0 < 0$ and $y$ is increasing if $\hat{\beta}_0 > 0$.
+
+- We can also scale our interpretations. e.g.,
+
+    - For every 7 [units of $x_i$] increase in [$x_i$], [$y$] [increases or decreases] by $\left[ 7 \times \left| \hat{\beta}_i \right| \right]$ [units of $y$].
+    
+- Note that in the case of multiple regression, there is an unspoken "after adjusting for everything else in the model" at the end of the sentence.
+
+    - Always remember that we are controlling for all other predictors included in the predictor set.
+
+## Interpretation of Slope {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's interpret the slopes for the model we constructed.
+
+```{r}
+coefficients(m1)
+```
+
+- For a 1 season increase in season number, we expect IMDB ratings to decrease by 0.1 points.
+
+    - For a 5 season increase in season number, we expect IMDB ratings to decrease by 0.47 points.
+    
+- For a 1 episode increase in episode number, we expect IMDB ratings to increase by 0.01 points.
+
+    - For a 10 episode increase in episode number, we expect IMDB ratings to increase by 0.14 points.
+
+## Interpretation of Intercept {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- The intercept is the average of the outcome when all predictors in the model are equal to 0. 
+
+- In our example,
+
+```{r, echo = TRUE}
+coefficients(m1)
+```
+
+- The average IMDB rating for season 0, episode 0 is 8.61.
+
+- Is this reasonable?
+
+## Confidence Intervals for $\beta_i$ {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+  
+  - Recall confidence intervals -- they allow us to determine how "good" our estimation is.
+
+- In general, CIs will take the form
+<center> point estimate $\pm$ margin of error </center>
+  
+  - The margin of error is a critical value (e.g., $t_{1-\alpha/2}$) multiplied by the standard error of the point estimate.
+
+- Recall that the standard error accounts for the sample size.
+
+- In R, we will run the model results through the `confint()` function. 
+
+```{r}
+#| eval: false
+confint(m)
+```
+
+## Confidence Intervals for $\beta_i$ {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- In our example, 
+
+```{r}
+confint(m1)
+```
+- We have the following CIs:
+  
+    - 95% CI for $\beta_{\text{season}}$ is (-0.12, -0.06)
+    - 95% CI for $\beta_{\text{episode}}$ is (0.003, 0.024)
+
+## Confidence Intervals for $\beta_i$ {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- We can change the confidence level by specifying the `level`.
+
+```{r}
+confint(m1, level=0.99)
+confint(m1, level=0.8914)
+```
+
+## Significant Regression Line {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- **Hypotheses**
+  
+    - $H_0: \ \beta_1 = ... = \beta_k = 0$ 
+    - $H_1:$ at least one $\beta_i \ne 0$ 
+  
+- **Test Statistic and *p*-Value**
+  
+    - $F_0$ and $p$; depends on `lm()` or `glm()`.
+
+- **Rejection Region**
+  
+    - Reject $H_0$ if $p < \alpha$
+    
+- **Conclusion/Interpretation**
+
+    - [Reject (*if $p < \alpha$*) or fail to reject (*if $p \ge \alpha$*)] $H_0$. There [is (*if reject*) or is not (*if FTR*)] sufficient evidence to suggest that at least one slope is non-zero.
+
+## Significant Regression Line {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- **Test Statistic and *p*-Value**
+  
+    - $F_0$ and $p$; depends on `lm()` or `glm()`. 🧐
+    
+- If `glm()`:
+
+```{r}
+#| eval: false
+full <- glm(y ~ pred1 + pred2 + ..., data = dataset, family = "gaussian")
+reduced <- glm(y ~ 1, data = dataset, family = "gaussian")
+anova(reduced, full)
+```    
+
+- If `lm()`:
+
+```{r}
+#| eval: false
+m <- lm(y ~ pred1 + pred2 + ..., data = dataset)
+summary(m)
+```
+
+## Significant Regression Line {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Looking at our example,
+
+::: {.panel-tabset}
+
+## `glm()` Output
+
+```{r}
+#| echo: false
+full <- glm(imdb_rating ~ season + episode, data = office_ratings, family = "gaussian")
+reduced <- glm(imdb_rating ~ 1, data = office_ratings, family = "gaussian")
+anova(reduced, full, test = "F")
+```
+
+## `glm()` Code
+
+```{r}
+#| eval: false
+full <- glm(imdb_rating ~ season + episode, data = office_ratings, family = "gaussian")
+reduced <- glm(imdb_rating ~ 1, data = office_ratings, family = "gaussian")
+anova(reduced, full, test = "F")
+```
+
+## `lm()` Output
+
+```{r}
+#| echo: false
+summary(m2)
+```
+
+## `lm()` Code
+
+```{r}
+#| eval: false
+summary(m2)
+```
+
+:::
+
+## Significant Regression Line {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- **Hypotheses**
+  
+    - $H_0: \ \beta_1 = \beta_2 = 0$ 
+    - $H_1:$ at least one $\beta_i \ne 0$ 
+  
+- **Test Statistic and *p*-Value**
+  
+    - $F_0 = 20.794$; $p < 0.001$.
+
+- **Rejection Region**
+  
+    - Reject $H_0$ if $p < \alpha$; $\alpha = 0.05$
+    
+- **Conclusion/Interpretation**
+
+    - Reject $H_0$. There is sufficient evidence to suggest that at least one slope is non-zero.
+
+## Significant Predictors of $y$ {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's now review the hypothesis test to determine if the *individual* slopes are significant.
+
+    - Because we are only dealing with continuous predictors, we can use the results from `summary()`, regardless if we used `glm()` or `lm()`.
+
+- **Hypotheses**
+
+    - $H_0: \ \beta_i  = 0$ 
+    - $H_1: \ \beta_i \ne 0$ 
+
+- **Test Statistic and *p*-Value**
+
+    - $t_0$ and $p$ from `summary()`
+
+- **Rejection Region**
+
+    - Reject $H_0$ if $p < \alpha$
+
+## Significant Predictors of $y$  {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's now determine which, if any, are significant predictors of IMDB ratings.
+
+```{r}
+summary(m1)
+```
+
+## Significant Predictors of $y$ {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- **Hypotheses**
+
+    - $H_0: \ \beta_{\text{season}}  = 0$ 
+    - $H_1: \ \beta_{\text{season}} \ne 0$ 
+
+- **Test Statistic and *p*-Value**
+
+    - $t_0 = -6.174$
+    
+    - $p < 0.001$
+
+- **Rejection Region**
+
+    - Reject $H_0$ if $p < \alpha$; $\alpha=0.05$ 
+    
+- **Conclusion/Interpretation**
+
+    - Reject $H_0$. There is sufficient evidence to suggest that season significantly predicts IMDB rating.
+    
+## Significant Predictors of $y$ {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- **Hypotheses**
+
+    - $H_0: \ \beta_{\text{episode}}  = 0$ 
+    - $H_1: \ \beta_{\text{episode}} \ne 0$ 
+
+- **Test Statistic and *p*-Value**
+
+    - $t_0 = 2.653$
+    
+    - $p = 0.009$
+
+- **Rejection Region**
+
+    - Reject $H_0$ if $p < \alpha$; $\alpha=0.05$ 
+    
+- **Conclusion/Interpretation**
+
+    - Reject $H_0$. There is sufficient evidence to suggest that episode number (of the season) significantly predicts IMDB rating.
+    
+## Predicted Values {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}   
+
+- Once we have a regression model, we can construct the predicted value ($\hat{y}$). Recall, $$\hat{y} = \hat{\beta}_0 + \hat{\beta}_1 x_1 + ... + \hat{\beta}_k x_k$$
+
+- If we plug in actual responses from the observations in the dataset, we can simplify and find the predicted value.
+
+    - i.e., what did we expect the outcome to be given the characteristics of that observation?
+    
+- In R, we will use the `predict()` function to add the predicted value to our dataset.
+
+```{r}
+#| eval: false
+
+dataset <- dataset %>%
+  mutate(y_hat = predict(m1))
+```
+
+- Note 1: we can use the `predict()` function regardless of using `lm()` or `glm()` to construct the model.
+
+- Note 2: there are issues using `predict()` if there is missing data in your dataset.
+
+## Predicted Values {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}   
+
+- **Note 2: there are issues using `predict()` if there is missing data in your dataset.**
+
+- When we model using the `glm()` and `lm()` functions, R automatically excludes any observations missing the variables specified in the model (either $y$ or any $x_i$).
+
+- We can exclude missing data on the front end,
+
+```{r}
+#| eval: false
+new_data <- data %>% # create dataset named new_data, plug in old dataset named data
+  select(y, x_1, x_2, ..., x_k) %>% # keep only the variables in the model
+  na.omit() # remove any observations that are missing any value
+```
+
+- Note that this is not the *optimal* solution to dealing with missing data.
+
+- There are methods specifically to handle missing data ([here is one free textbook](https://stefvanbuuren.name/fimd/))
+
+## Predicted Values {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}   
+
+- In our Office example,
+
+```{r}
+office_ratings <- office_ratings %>%
+  mutate(y_hat_m1 = predict(m1),
+         y_hat_m2 = predict(m2))
+head(office_ratings, n=5)
+```
+
+## Visualizing the Results {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- It often helps for us to visualize the model we have constructed.
+
+- Recall that while we often refer to it as a "regression line," it is actually a "response surface"
+
+    - Visualization gets increasingly difficult as we add predictors to our model.
+    
+- We must hold all but one variable (that will be on the *x*-axis) constant and create a predicted value.
+
+    - This means that we will create a version of a predicted value.
+    
+    - Unfortunately there is not a function to do this.
+    
+- In theory you could hard code everything, however, I prefer to save the output of the `coefficients()` function and call individual pieces (see example).
+
+```{r}
+#| eval: false
+
+c <- coefficients(m)
+```
+
+## Visualizing the Results {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's create a graph for our Office model. 
+
+```{r}
+(c1 <- coefficients(m1))
+```
+
+- I personally think season is more interesting, so I will let that one vary.
+
+- This means that we need to plug in value(s) for episode.
+
+    - I will create lines for episodes 1, 10, and 20.
+
+```{r}
+office_ratings <- office_ratings %>%
+  mutate(y_hat_ep1 = c1["(Intercept)"] + c1["season"]*season + c1["episode"]*1,
+         y_hat_ep10 = c1["(Intercept)"] + c1["season"]*season + c1["episode"]*10,
+         y_hat_ep20 = c1["(Intercept)"] + c1["season"]*season + c1["episode"]*20)
+```
+
+## Visualizing the Results {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's check the dataset. 
+
+```{r}
+head(office_ratings)
+```
+
+## Visualizing the Results {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Let's build our visualization.
+
+::: {.panel-tabset}
+
+## first draft
+
+```{r}
+#| eval: false
+office_ratings %>% 
+  ggplot(aes(x = season)) +
+  geom_point(aes(y = imdb_rating)) +
+  geom_line(aes(y = y_hat_ep1), color = "blue") +
+  geom_line(aes(y = y_hat_ep10), color = "purple") +
+  geom_line(aes(y = y_hat_ep20), color = "darkgreen") +
+  theme_bw()
+```
+
+## first graph
+
+<center>
+```{r}
+#| echo: false
+office_ratings %>% 
+  ggplot(aes(x = season)) +
+  geom_point(aes(y = imdb_rating)) +
+  geom_line(aes(y = y_hat_ep1), color = "blue") +
+  geom_line(aes(y = y_hat_ep10), color = "purple") +
+  geom_line(aes(y = y_hat_ep20), color = "darkgreen") +
+  theme_bw()
+```
+</center>
+
+## second draft
+
+```{r}
+#| eval: false
+office_ratings %>% 
+  ggplot(aes(x = season)) +
+  geom_point(aes(y = imdb_rating)) +
+  geom_line(aes(y = y_hat_ep1), color = "blue") +
+  geom_line(aes(y = y_hat_ep10), color = "purple") +
+  geom_line(aes(y = y_hat_ep20), color = "darkgreen") +
+  geom_text(aes(x = 9.75, y = 8.05, label = "Episode 20     ")) +
+  geom_text(aes(x = 9.75, y = 7.90, label = "Episode 10     ")) +
+  geom_text(aes(x = 9.75, y = 7.75, label = "Episode  1     ")) +
+  scale_x_continuous(breaks = office_ratings$season) +
+  labs(x = "Season", y = "IMDB Rating") +
+  ylim(6, 10) +
+  theme_bw()
+```
+
+## second graph
+
+<center>
+```{r}
+#| echo: false
+office_ratings %>% 
+  ggplot(aes(x = season)) +
+  geom_point(aes(y = imdb_rating)) +
+  geom_line(aes(y = y_hat_ep1), color = "blue") +
+  geom_line(aes(y = y_hat_ep10), color = "purple") +
+  geom_line(aes(y = y_hat_ep20), color = "darkgreen") +
+  geom_text(aes(x = 9.75, y = 8.05, label = "Episode 20     ")) +
+  geom_text(aes(x = 9.75, y = 7.90, label = "Episode 10     ")) +
+  geom_text(aes(x = 9.75, y = 7.75, label = "Episode  1     ")) +
+  scale_x_continuous(breaks = office_ratings$season) +
+  labs(x = "Season", y = "IMDB Rating") +
+  ylim(6, 10) +
+  theme_bw()
+```
+</center>
+
+## razzle dazzle time
+
+<center>
+```{r}
+#| eval: false
+
+office_ratings %>% 
+  mutate(finale = if_else((season == 1 & episode == 6) | 
+                          (season == 2 & episode == 22) | 
+                          (season == 3 & episode == 23) | 
+                          (season == 4 & episode == 14) |
+                          (season == 5 & episode == 26) |
+                          (season == 6 & episode == 26) |
+                          (season == 7 & episode == 24) |
+                          (season == 8 & episode == 24) |
+                          (season == 9 & episode == 23), "Yes", "No")) %>%
+  ggplot(aes(x = season)) +
+  geom_point(aes(y = imdb_rating, color = as.factor(finale))) +
+  geom_line(aes(y = y_hat_ep1)) +
+  geom_line(aes(y = y_hat_ep10)) +
+  geom_line(aes(y = y_hat_ep20)) +
+  geom_text(aes(x = 9.75, y = 8.05, label = "Episode 20     ")) +
+  geom_text(aes(x = 9.75, y = 7.90, label = "Episode 10     ")) +
+  geom_text(aes(x = 9.75, y = 7.75, label = "Episode  1     ")) +
+  scale_x_continuous(breaks = office_ratings$season) +
+  labs(x = "Season", y = "IMDB Rating", color = "Finale") +
+  ylim(6, 10) +
+  theme_bw()
+```
+</center>
+
+## final graph
+
+<center>
+```{r}
+#| echo: false
+
+office_ratings %>% 
+  mutate(finale = if_else((season == 1 & episode == 6) | 
+                          (season == 2 & episode == 22) | 
+                          (season == 3 & episode == 23) | 
+                          (season == 4 & episode == 14) |
+                          (season == 5 & episode == 26) |
+                          (season == 6 & episode == 26) |
+                          (season == 7 & episode == 24) |
+                          (season == 8 & episode == 24) |
+                          (season == 9 & episode == 23), "Yes", "No")) %>%
+  ggplot(aes(x = season)) +
+  geom_point(aes(y = imdb_rating, color = as.factor(finale))) +
+  geom_line(aes(y = y_hat_ep1)) +
+  geom_line(aes(y = y_hat_ep10)) +
+  geom_line(aes(y = y_hat_ep20)) +
+  geom_text(aes(x = 9.75, y = 8.05, label = "Episode 20     ")) +
+  geom_text(aes(x = 9.75, y = 7.90, label = "Episode 10     ")) +
+  geom_text(aes(x = 9.75, y = 7.75, label = "Episode  1     ")) +
+  scale_x_continuous(breaks = office_ratings$season) +
+  labs(x = "Season", y = "IMDB Rating", color = "Finale") +
+  ylim(6, 10) +
+  theme_bw()
+```
+</center>
+
+:::
+
+## Visualizing the Results {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Even with a simple example, graphing is still complicated.
+
+- In the example: 
+
+    - IMDB ratings must go on the *y*-axis as it is our outcome.
+
+    - We selected season to be on the *x*-axis, however, we could have put episode number on the *x*-axis.
+    
+    - We graphed a few different episode numbers - we could limit it to one or we could expand it to include more.
+    
+- You will see that graphing resulting regression results gets really complicated really fast simply due to the number of predictors in the model.
+
+- We can also do fancier things with graphs, like include confidence bands or overlay [loess lines](https://en.wikipedia.org/wiki/Local_regression).
+
+    - In class, I demonstrate the base "example" graphs I provide collaborators as a tool for discussion.
+    
+    - These are just starting points and I will edit graphs based on feedback and requests from collaborators.
+
+## Wrap Up {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"}
+
+- Today we reminded ourselves about multiple regression. We covered how to:
+
+    - construct the model in R,
+    
+    - interpret the intercept and slope,
+    
+    - find the confidence interval for $\beta_i$,
+    
+    - determine if the regression line is significant,
+    
+    - determine if individual predictors are significant, 
+    
+    - create predicted values, and
+    
+    - visualize regression results.
+
+- Other lectures this week include: 
+
+    - regression assumptions,
+    
+    - regression diagnostics, and
+    
+    - introduce categorical predictors.
+    
+
+
+
+
+
+    
+
+
