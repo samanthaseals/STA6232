@@ -2,8 +2,8 @@
 
 This is the repository for STA4231 and STA6232 - Statistics for Data Science II.
 
-| Week | Lecture |
-|------|---------------------------------------------------------|
+| Week | Lecture | Link |
+|------|---------------------------------------------------------|---|
 | 1 | Multiple Linear Regression (refresher) | [raw qmd](https://github.com/samanthaseals/STA6232/blob/main/lectures/W1-L1-modeling-basics.qmd)
 |   | Categorical Predictors | [raw qmd](https://github.com/samanthaseals/STA6232/blob/main/lectures/W1-L2-categorical-predictors.qmd)
 |   | Regression Assumptions and Diagnostics | [raw qmd](https://github.com/samanthaseals/STA6232/blob/main/lectures/W1-L3-assumptions-and-diagnostics.qmd)
