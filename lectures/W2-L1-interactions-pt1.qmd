@@ -1,0 +1,457 @@
+---
+title: "Interaction Terms (Part 1)"
+subtitle: "Statistics for Data Science II"
+execute:
+  echo: true
+  warning: false
+  message: false
+format: 
+  revealjs:
+    theme: uwf2
+    embed-resources: true
+    slide-number: false
+    width: 1600
+    height: 900
+    df-print: paged
+    html-math-method: katex
+title-slide-attributes:
+    data-background-image: /Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/title.png
+    data-background-size: contain 
+editor: source
+pdf-separate-fragments: true
+fig-align: center
+---
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Recall the general linear model, 
+
+$$ y = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k + \varepsilon $$
+
+- Until now, we have talked about models with only main effects.
+
+    - e.g., $x_1$, $x_2$
+
+- Today, we will begin talking about interactions.
+
+    - e.g., $x_1 \times x_2$
+
+## Interactions {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Recall interactions from two-way ANOVA:
+
+    - The relationship between the outcome and one predictor depends on the level of another predictor.
+
+- Interactions work (and are specified) the same way in regression. 
+
+- The usual caveats apply:
+
+    - We do not want to load models with too many interactions.
+    
+    - We favor simplicity over interactions that do not add much to the predictive power of the model.
+
+    - We do not want higher than two-way interactions unless necessary.
+    
+- Today we will focus on continuous $\times$ continuous interactions.
+
+## Interactions {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We will construct what is called a hierarchical well-formulated (HWF) model. 
+- This means that when a higher-order interaction term is included in the model, all lower-order terms are also included.
+
+- e.g., when a two-way interaction is included, we also include the corresponding main effects.
+
+$$y = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \beta_3 x_1 x_2$$
+
+- e.g., when a three-way interaction is included, we also include the corresponding main effects and two-way interactions.
+
+$$y = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \beta_3 x_3 + \beta_4 x_1 x_2 + \beta_5 x_1 x_3 + \beta_6 x_2 x_3 + \beta_7 x_1 x_2 x_3$$
+
+## Today's Data {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+```{r}
+library(tidyverse)
+ratings <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-25/ratings.csv')
+details <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-25/details.csv')
+all <- full_join(ratings, details, by = "id")
+head(all, n=5)
+```
+
+## Example - Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## Model
+```{r}
+m1 <- lm(average ~ year + minplayers + playingtime + minplayers:playingtime, 
+         data = all) 
+```
+
+## Results
+
+```{r}
+summary(m1)
+```
+
+:::
+
+## Example - Exploration {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Wait, maybe we should explore the data first.
+
+```{r}
+quantile(all$playingtime, c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE) 
+```
+
+<center><img src = "https://www.emoji.co.uk/files/apple-emojis/smileys-people-ios/53-face-with-open-mouth-and-cold-sweat.png"></center>
+
+## Example - Exploration {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- How many games take longer than 5 hours (!!) to play?
+
+    - There are 668 observations in this dataset.😳
+
+```{r}
+head(all %>% filter(playingtime > 300), n = 3)
+```
+
+## Example - Exploration {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's keep exploring. What about year?
+
+```{r}
+quantile(all$year, c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE) 
+```
+
+<center><img src = "https://www.emoji.co.uk/files/apple-emojis/smileys-people-ios/53-face-with-open-mouth-and-cold-sweat.png"></center>
+
+
+## Example - Exploration {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's keep exploring. What about minimum player count?
+
+```{r}
+#| eval: false
+all %>% count(minplayers)
+```
+
+```{r}
+#| echo: false
+count <- all %>% 
+  count(minplayers) %>%
+   tibble::rownames_to_column() %>%  
+   pivot_longer(-rowname) %>% 
+   pivot_wider(names_from=rowname, values_from=value) 
+head(count)
+```
+
+<center><img src = "https://www.emoji.co.uk/files/apple-emojis/smileys-people-ios/53-face-with-open-mouth-and-cold-sweat.png"></center>
+
+## Example - Final Data Cleaning {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We now will perform some data cleaning.
+
+    - Limit playing time to (0, 300]
+    
+    - Limit years to (1900, 2024)
+    
+    - Limit number of players to [1, $\infty$)
+    
+::: {.panel-tabset}
+
+## Code
+
+```{r}
+analytic <- all %>% 
+  filter(playingtime <= 300 & # ≤ 300 min
+         playingtime > 0 & # > 0 min
+         year > 1900 & # filter out games without years
+         year < 2024 & # filter out games with too large of years
+         minplayers > 0) %>% # require at least 1 player for game
+  select(id, name, average, year, playingtime, minplayers) %>%
+  na.omit()
+```
+
+## Result
+
+```{r}
+#| echo: false
+head(analytic, n = 3)
+```
+
+## Differences?
+
+<center><img src = "images/W2-L1-a.png"></center>
+
+:::
+
+## Example - Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let us now update our model, 
+
+::: {.panel-tabset}
+
+## Model
+
+```{r}
+m2 <- lm(average ~ year + minplayers + playingtime + minplayers:playingtime, 
+         data = analytic)
+```
+
+## Results
+
+```{r}
+summary(m2)
+```
+
+:::
+
+## Example - Model Comparison {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## Model 1 (pre-cleaning)
+
+```{r}
+#| echo: false
+summary(m1)
+```
+
+## Model 2 (post-cleaning)
+
+```{r}
+#| echo: false
+summary(m2)
+```
+
+:::
+
+## Example - Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Suppose we weren't actually interested in year as a predictor. Then,
+
+::: {.panel-tabset}
+
+## Model
+
+```{r}
+m3 <- lm(average ~ playingtime + minplayers + playingtime:minplayers, 
+         data = analytic)
+```
+
+## Results
+
+```{r}
+summary(m3)
+```
+
+:::
+
+## Example - Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- I personally do not want to interpret playing time in terms of a 1 minute increase, so I will scale it by 60 minutes (so, 1 hour increments)
+
+::: {.panel-tabset}
+
+## Scaling
+```{r}
+analytic <- analytic %>% 
+  mutate(play60 = playingtime/60)
+```
+
+## Model
+
+```{r}
+m4 <- lm(average ~ minplayers + play60 + minplayers:play60, 
+         data = analytic)
+```
+
+## Results
+
+```{r}
+summary(m4)
+```
+
+:::
+
+## Example - Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Thus, our model is as follows,
+
+```{r}
+coefficients(m4)
+```
+
+$$\hat{\text{rating}} = 6.46 -0.17 \text{ min. players} + 0.32 \text{ time} - 0.02 \text{ min. players $\times$ time}$$
+
+- ... how do we interpret the interaction?
+
+- Note that we cannot interpret the main effects of the interaction term
+
+    - i.e., we cannot interpret *minimum player count* and *playing time* alone.
+    
+
+## Example - Model Dissection {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- If we look at the interaction term,
+
+```{r}
+coefficients(m4)["minplayers:play60"]
+```
+
+- One general interpretation is that as playing time increases, the slope describing the relationship between average rating and minimum player count decreases.
+
+- The other general interpretation is that as minimum player count increases, the slope describing the relationship between average rating and playing time decreases.
+
+## Example - Simplifying Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- For visualization purposes, we will plug in values and reduce down.
+
+::: {.panel-tabset}
+
+## Min. 2 players
+
+- Let's plug in for a minimum player count of 2.
+
+$$
+\begin{align*}
+\hat{\text{rating}} &= 6.46 -0.17 \text{ min. players} + 0.32 \text{ time} - 0.02 \text{ min. players $\times$ time} \\
+&= 6.46  -0.17(2) + 0.32 \text{ time} - 0.02 (2) \text{ time} \\
+&= 6.46  -0.34 + 0.32 \text{ time} - 0.04 \text{ time} \\
+&= (6.46 -0.34)   + (0.32  - 0.04) \text{ time} \\
+&= 6.12 + 0.28 \text{ time}
+\end{align*}
+$$
+
+## Min. 4 players
+
+- Let's plug in for a minimum player count of 4.
+
+$$
+\begin{align*}
+\hat{\text{rating}} &= 6.46 -0.17 \text{ min. players} + 0.32 \text{ time} - 0.02 \text{ min. players $\times$ time} \\
+&= 6.46  -0.17(4) + 0.32 \text{ time} - 0.02 (4) \text{ time} \\
+&= 6.46  -0.68 + 0.32 \text{ time} - 0.08 \text{ time} \\
+&= (6.46 -0.68)   + (0.32  - 0.08) \text{ time} \\
+&= 5.78 + 0.24 \text{ time}
+\end{align*}
+$$
+
+## Simplified Models
+
+- Thus, we have the two models,
+
+$$
+\begin{align*}
+\hat{\text{rating}}_{\text{player = 2}} &= 6.12 + 0.28 \text{ time} \\
+\hat{\text{rating}}_{\text{player = 4}} &= 5.78 + 0.24 \text{ time}
+\end{align*}
+$$
+:::
+
+## Interpretations {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## Notes
+
+- Interaction terms are tricky with interpretations.
+
+- To interpret the interaction, remember that the relationship between the outcome and one predictor depends on the level of a second predictor.
+
+    - The interaction term itself gives you an idea of what's happening.
+    
+    - We can also provide proper interpretations once we simplify the model.
+    
+## Model with Interaction
+
+$$\hat{\text{rating}} = 6.46 -0.17 \text{ min. players} + 0.32 \text{ time} - 0.02 \text{ min. players $\times$ time}$$
+
+- As minimum player count increases, the slope describing the relationship between average rating and playing time decreases by 0.02 rating points.
+    
+## Simplified Models
+
+$$
+\begin{align*}
+\hat{\text{rating}}_{\text{player = 2}} &= 6.12 + 0.28 \text{ time} \\
+\hat{\text{rating}}_{\text{player = 4}} &= 5.78 + 0.24 \text{ time}
+\end{align*}
+$$
+
+- When looking at a 2 player game, for every hour increase in time-to-play, the game's rating increases by 0.28 rating points.
+
+- When looking at a 4 player game, for every hour increase in time-to-play, the game's rating increases by 0.24 rating points.
+
+:::
+
+
+## Example - Predicted Values {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We want to create a visualization for our model.
+
+    - We have "taken care of" the interaction by plugging in values for minimum player count.
+    
+- We need to decide what goes on the *x*-axis.
+
+    - In this (very simplistic) example, we only have one variable - playing time in hours.
+
+    - In other, more complicated models, we will have to choose one to allow to vary (and include it on the *x*-axis), then create predicted values while holding everything else in the model constant. 
+    
+## Example - Model Visualization {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+    
+::: {.panel-tabset}
+
+## Create predicted values
+
+```{r}
+analytic <- analytic %>%
+  mutate(rating_2 = 6.12 + 0.28*play60,
+         rating_4 = 5.78 + 0.24*play60)
+```
+
+## Check predicted values
+
+```{r}
+#| echo: false
+head(analytic)
+```
+    
+## Graph code
+
+```{r}
+#| eval: false
+analytic %>% 
+  ggplot(aes(x = play60, y = average, color = as.factor(minplayers))) +
+  geom_point() +
+  geom_line(aes(y = rating_2), color = "hotpink") +
+  geom_line(aes(y = rating_4), color = "purple") +
+  labs(x = "Playing Time (Hours)",
+       y = "Average Rating on BGG",
+       color = "Minimum Number of Players") +
+  theme_bw()
+```
+    
+## Graph
+
+<center>
+```{r}
+#| echo: false
+analytic %>% 
+  ggplot(aes(x = play60, y = average, color = as.factor(minplayers))) +
+  geom_point() +
+  geom_line(aes(y = rating_2), color = "hotpink") +
+  geom_line(aes(y = rating_4), color = "purple") +
+  labs(x = "Playing Time (Hours)",
+       y = "Average Rating on BGG",
+       color = "Minimum Number of Players") +
+  theme_bw()
+```
+</center>
+
+:::
+
+## Wrap Up {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+    
+- We covered the simplest case of interactions in this lecture, continuous $\times$ continuous.
+
+- Next lecture, we will continue talking about interactions, including when categorical predictors are involved.
