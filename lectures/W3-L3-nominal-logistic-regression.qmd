@@ -1,0 +1,334 @@
+---
+title: "Nominal Logistic Regression"
+subtitle: "Statistics for Data Science II"
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: true
+format: 
+  revealjs:
+    theme: uwf2
+    embed-resources: true
+    slide-number: false
+    width: 1600
+    height: 900
+    df-print: paged
+    html-math-method: katex
+title-slide-attributes:
+    data-background-image: /Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/title.png
+    data-background-size: contain 
+editor: source
+pdf-separate-fragments: true
+fig-align: center
+---
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We have discussed binary logistic regression for binomial outcomes,
+
+$$\ln \left( \frac{\pi}{1-\pi} \right) = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k$$
+
+- We have also discussed ordinal logistic regression for ordinal outcomes,
+
+$$\ln \left( \frac{\pi_1 + ... + \pi_j }{\pi_{j+1} + ... + \pi_{c}} \right) = \hat{\beta}_{0j} + \hat{\beta}_{1} x_1 + ... + \hat{\beta}_{k} x_k$$
+
+- Today, we will discuss nominal logistic regression for multinomial outcomes,
+
+$$\ln \left( \frac{\pi_j}{\pi_{\text{ref}}} \right) = \hat{\beta}_{0j} + \hat{\beta}_{1j} x_1 + ... + \hat{\beta}_{kj} x_k$$
+
+## Nominal (or Multinomial) Logistic Regression {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Like in ordinal logistic regression, we will create $c-1$ models.
+
+    - Unlike ordinal logistic regression, we no longer assume proportional odds.
+    
+    - This means that we now have different slopes for each model constructed.
+    
+$$\ln \left( \frac{\pi_j}{\pi_{\text{ref}}} \right) = \hat{\beta}_{0j} + \hat{\beta}_{1j} x_1 + ... + \hat{\beta}_{kj} x_k$$
+
+- We will now use the `multinom()` function from the `nnet` package.
+
+```{r}
+#| eval: false
+library(nnet)
+m <- multinom(outcome ~ var_1 + var_2 + ... + var_k, 
+              data = dataset)
+```
+
+## Example {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## Setup
+
+Let's consider data from a General Social Survey, relating political ideology to political party affiliation. Political ideology has a five-point ordinal scale, ranging from very liberal ($Y=1$) to very conservative ($Y=5$). Let $x$ be an indicator variable for political party, with $x = 1$ for Democrats and $x = 0$ for Republicans. We will construct an ordinal logistic regression model that models political ideology as a function of political party and sex.
+
+## Data
+
+```{r}
+#| echo: false
+library(gsheet)
+library(tidyverse)
+gss <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1QgTiSaxVkZvLs9guX-pnAxln0hn4Xtsa1DiRGjcKXsM/edit?usp=sharing") %>%
+  mutate(Ideology = as.factor(Ideology))
+head(gss)
+```
+
+## Code
+
+```{r}
+#| eval: false
+library(gsheet)
+library(tidyverse)
+gss <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1QgTiSaxVkZvLs9guX-pnAxln0hn4Xtsa1DiRGjcKXsM/edit?usp=sharing") %>%
+  mutate(Ideology = as.factor(Ideology))
+head(gss)
+```
+
+:::
+
+
+## Example {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's model ideology as a function of political party affiliation and sex.
+
+::: {.panel-tabset}
+
+## R output
+
+```{r}
+#| echo: false
+library(nnet)
+m1 <- multinom(Ideology ~ Party + Sex,
+                 data = gss)
+summary(m1)
+```
+
+## Resulting Models
+
+$$
+\begin{align*}
+  \ln \left( \frac{\pi_{\text{Lib}}}{\pi_{\text{V. Lib}}} \right) &= 0.07 + 0.42 \text{ republican} - 0.14 \text{ male} \\
+  \ln \left( \frac{\pi_{\text{Mod}}}{\pi_{\text{V. Lib}}} \right) &= 0.90 + 0.86 \text{ republican} - 0.37 \text{ male} \\
+  \ln \left( \frac{\pi_{\text{Cons}}}{\pi_{\text{V. Lib}}} \right) &= -0.74 + 1.68 \text{ republican} + 0.16 \text{ male} \\
+  \ln \left( \frac{\pi_{\text{V. Cons}}}{\pi_{\text{V. Lib}}} \right) &= -0.41 + 1.56 \text{ republican} + 0.08 \text{ male}
+\end{align*}
+$$
+
+## Code
+
+```{r}
+#| eval: false
+library(nnet)
+m1 <- multinom(Ideology ~ Party + Sex,
+                 data = gss)
+summary(m1)
+```
+
+:::
+
+## Interpretations {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## Continuous Predictors
+
+- For a one [predictor unit] increase in [predictor], the odds of [response category $j$], as compared to [the reference category], are multiplied by e$^{\hat{\beta}_i}$.
+    
+- For a one [predictor unit] increase in [predictor], the odds of [response category $j$], as compared to [the reference category], are [increased or decreased] by [100(e$^{\hat{\beta}_i}$-1)\% or 100(1-e$^{\hat{\beta}_i}$)\%].
+    
+## Categorical Predictors
+
+- As compared to [reference category of predictor], the odds of [response category $j$], as compared to [reference category of outcome], for [predictor category of interest] are multiplied by e$^{\hat{\beta}_i}$.
+    
+- As compared to [reference category of predictor], the odds of [response category $j$], as compared to [reference category of outcome], for [predictor category of interest] are [increased or decreased] by [100(e$^{\hat{\beta}_i}$-1)\% or 100(1-e$^{\hat{\beta}_i}$)\%].  
+
+:::
+
+## Example {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's look at interpreting our models.
+
+```{r}
+round(exp(coefficients(m1)), 2)
+```
+
+- **Specific:** As compared to someone who identifies as a democrat, someone who identifies as republican has a 377% increase in the odds of saying their political ideology is very conservative as compared to very liberal.
+
+- **More general:** As compared to identifying as having a very liberal political ideology, those that identify as republican have increased odds of reporting more conservative political ideologies.
+
+## Inference - Hypothesis Testing {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- As we saw, the results from `summary()` do not include hypothesis test results.
+
+::: {.panel-tabset}
+
+## Global Level
+
+- To determine global significance, we will use full/reduced ANOVA.
+
+```{r}
+#| eval: false
+car::Anova(model, type = 3)
+```
+
+## Model Level
+
+- We will construct p-values "by hand" for the individual models.
+
+```{r}
+#| eval: false
+m <- multinom(outcome ~ var_1 + var_2 + ... + var_k, data = dataset)
+z <- summary(m1)$coefficients/summary(m1)$standard.errors # construct z
+p <- (1 - pnorm(abs(z)))*2 # construct p-values
+t(p) # transpose to columns
+```
+
+:::
+
+## Example {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's explore significance for our models.
+
+::: {.panel-tabset}
+
+## Global Level - Party
+
+- To determine global significance, we will use `car::Anova()`.
+
+```{r}
+car::Anova(m1, type = 3)
+```
+
+## Model Level
+
+- We construct p-values "by hand" for the individual models.
+
+```{r}
+z <- summary(m1)$coefficients/summary(m1)$standard.errors # construct z
+p <- (1 - pnorm(abs(z)))*2 # construct p-values
+t(p) # transpose to columns
+```
+
+## Results
+
+- Globally, only political party is a significant predictor of political ideology ($p < 0.001$).
+
+- This holds true when comparing moderate ($p < 0.001$), conservative ($p < 0.001$), and very conservative ($p < 0.001$) to very liberal.
+
+:::
+
+## Inference - Hypothesis Testing {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- What if we are interested in comparing against, say, moderate ideology?
+
+    - We would restructure the data such that moderate would be the "first" category that R saw.
+    
+- Global significance will not change.
+
+- Model level significance will change.
+
+    - This is because we are now comparing the outcomes to moderates, instead of very liberal.
+
+## Inference - Confidence Intervals {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Like before, we can construct confidence intervals using the `confint()` function.
+
+- We, of course, want the confidence intervals of the odds ratios.
+
+```{r}
+round(exp(confint(m1)),2)
+```
+
+## Wrap Up {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We have now covered logistic regression for all types of categorical outcomes.
+
+    - Two responses $\to$ binary logistic regression.
+    
+    - More than two ordered* responses $\to$ ordinal logistic regression.
+    
+        - *: if we do not meet the proportional odds assumption, ignore ordering.
+    
+    - More than two responses $\to$ nominal logistic regression.
+    
+- Note that we have learned the models with a *logit* link function.
+
+    - We can also use *probit* and *complementary log log* (cloglog) link functions.
+    
+    - You can read a discussion about the differences [on stack overflow](https://stats.stackexchange.com/questions/20523/difference-between-logit-and-probit-models)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

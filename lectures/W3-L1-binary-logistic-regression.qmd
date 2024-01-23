@@ -1,0 +1,275 @@
+---
+title: "Binary Logistic Regression"
+subtitle: "Statistics for Data Science II"
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: true
+format: 
+  revealjs:
+    theme: uwf2
+    embed-resources: true
+    slide-number: false
+    width: 1600
+    height: 900
+    df-print: paged
+    html-math-method: katex
+title-slide-attributes:
+    data-background-image: /Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/title.png
+    data-background-size: contain 
+editor: source
+pdf-separate-fragments: true
+fig-align: center
+---
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We have previously discussed continuous outcomes and the normal distribution.
+
+- Let's now consider categorical outcomes:
+
+    - Binary
+    
+    - Ordinal
+    
+    - Multinomial
+    
+## Binary Logistic Regression {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We model binary outcomes using logistic regression,
+
+$$\ln \left( \frac{\pi}{1-\pi} \right) = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k,$$
+
+- where $\pi = \text{P}[Y = 1]$ = the probability of the outcome/event.
+
+- How is this different from linear regression?
+
+$$ y = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k $$
+
+## R Syntax {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- In the [`glm()`](https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/glm) function, we specify the binomial [`family`](https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/family).
+
+```{r}
+#| eval: false
+m <- glm([outcome] ~ [pred_1] + [pred_2] + ... + [pred_k], 
+         data = [dataset], 
+         family = "binomial")
+```
+
+## Today's Data {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Today we will be using the [Roy Kent](https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-09-26/readme.md) dataset from [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday).
+
+::: {.panel-tabset}
+
+## Data
+
+```{r}
+#| echo: false
+library(tidyverse)
+richmondway <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-09-26/richmondway.csv') %>%
+  mutate(dating = if_else(Dating_flag == "Yes", 1, 0),
+         IMDB = if_else(Imdb_rating >= 8.5, 1, 0)) %>%
+  select(Season, Episode, F_count_RK, F_perc, dating, IMDB) 
+head(richmondway)
+```
+
+## Code
+
+```{r}
+#| eval: false
+library(tidyverse)
+richmondway <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-09-26/richmondway.csv') %>%
+  mutate(dating = if_else(Dating_flag == "Yes", 1, 0),
+         IMDB = if_else(Imdb_rating >= 8.5, 1, 0)) %>%
+  select(Season, Episode, F_count_RK, F_perc, dating, IMDB) 
+# quantile(richmondway$Imdb_rating, c(0, 0.25, 0.5, 0.75, 1))
+# richmondway %>% count(IMDB_9)  
+```
+
+:::
+
+## Example: Roy Kent's F-Bombs {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's model the odds of Roy Kent and Keeley Jones dating in a particular episode (*dating*) as a function of the percentage of F-bombs that belong to Roy Kent (*F_perc*) and if the IMDB rating is an 8.5 or better (*IMDB*).
+
+```{r}
+m1 <- glm(dating ~ F_perc + IMDB, 
+          data = richmondway, 
+          family = "binomial"(link="logit"))
+summary(m1)
+```
+
+## Example: Roy Kent's F-Bombs {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+```{r}
+coefficients(m1)
+```
+
+- The model is as follows,
+
+$$\ln \left( \frac{\hat{\pi}}{1-\hat{\pi}} \right) = -1.76 + 0.03 x_1 + 0.38 x_2,$$ 
+
+- where 
+
+    - $x_1$ is the episode's percentage of the F-bombs from Roy Kent
+    - $x_2$ is the IMDB rating categorization of the episode
+    
+        - 0 = IMDB rating < 8.5
+        - 1 = IMDB rating $\ge$ 8.5
+    
+## Odds Ratios {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Recall the binary logistic regression model,
+
+$$ \ln \left( \frac{\pi}{1-\pi} \right) = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k, $$
+
+- We are modeling the log odds, which are not intuitive with interpretations.
+
+- To be able to discuss the odds, we will "undo" the natural log by exponentiation. 
+
+- i.e., if we want to interpret the slope for $x_i$, we will look at $e^{\hat{\beta}_i}$.
+
+- When interpreting $\hat{\beta}_i$, it is an additive effect on the log odds. 
+
+- When interpreting $e^{\hat{\beta}_i}$, it is a multiplicative effect on the odds.
+
+## Odds Ratios {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Why is it a multiplicative effect?
+
+$$
+\begin{align*}
+  \ln \left( \frac{\pi}{1-\pi} \right) &= \beta_0 + \beta_1 x_1 + ... + \beta_k x_k \\
+  \exp\left\{ \ln \left( \frac{\pi}{1-\pi} \right) \right\} &= \exp\left\{ \beta_0 + \beta_1 x_1 + ... + \beta_k x_k \right\} \\
+  \frac{\pi}{1-\pi}  &= e^{\beta_0} e^{\beta_1 x_1} \cdots e^{\beta_k x_k}
+\end{align*}
+$$
+
+## Odds Ratios {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- For continuous predictors:
+
+    - For a 1 [unit of predictor] increase in [predictor name], the odds of [outcome] are multiplied by  [$e^{\hat{\beta}_i}$]. 
+    - For a 1 [unit of predictor] increase in [predictor name], the odds of [outcome] are [increased or decreased] by [100(e$^{\hat{\beta}_i}$-1)\% or 100(1-e$^{\hat{\beta}_i}$)\%].
+    
+- For categorical predictors:
+
+    - As compared to [the reference group], the odds of [outcome] for [group that the slope belongs to] are multiplied by  [$e^{\hat{\beta}_i}$]. 
+    - As compared to [the reference group], the odds of [outcome] for [group that the slope belongs to] are [increased or decreased] by [100(e$^{\hat{\beta}_i}$-1)\% or 100(1-e$^{\hat{\beta}_i}$)\%].
+
+## Example: Roy Kent's F-Bombs {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+```{r}
+round(exp(coefficients(m1)),2)
+```
+
+- Let's interpret the odds ratios:
+
+    - For a 1 percentage point increase in the percentage of f-bombs that came from Roy Kent, the odds of Roy and Keeley dating increase by 3%.
+    
+    - As compared to when episodes have less than an IMDB rating of 8.5, the odds of Roy and Keeley dating are 46% higher in episodes with an IMDB rating of at least 8.5.
+
+    
+## Tests for Significant Predictors {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- What we've learned so far re: significance of predictors holds true with logistic regression
+
+::: {.panel-tabset}
+
+## Wald's $Z$ with `summary()`
+
+- Looking at the results from `summary()`:
+
+```{r}
+summary(m1)
+```
+
+## Partial $F$ with `car::Anova()`
+
+- Using the full/reduced Partial $F$ approach:
+
+```{r}
+car::Anova(m1, type=3)
+```
+:::
+
+## Test for Significant Regression Line {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- What we've learned so far re: significance of predictors holds true with logistic regression
+
+    - Significance of regression line $\to$ ANOVA with full/reduced models
+
+```{r}
+full <- glm(dating ~ F_perc + IMDB, data = richmondway, family = "binomial"(link="logit"))
+reduced <- glm(dating ~ 1, data = richmondway, family = "binomial"(link="logit")) # intercept only model
+anova(reduced, full, test = "LRT")
+```
+
+## Predicted Values for Data Visualization {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- The guidelines we've set up for data visualization still hold true.
+
+- We will put our outcome on the $y$-axis and a continuous (or at least ordinal) predictor on the $x$-axis.
+
+    - We will hold all other predictors constant in order to create lines.
+
+- Recall the logistic regression model,
+$$ \ln \left( \frac{\pi_i}{1-\pi_i} \right) = \beta_0 + \beta_1 x_{1i} + ... + \beta_k x_{ki} $$
+
+- We can solve for the probability, which allows us to predict the probability that $y_i=1$ given the specified model:
+$$ \pi_i = \frac{\exp\left\{ \beta_0 + \beta_1 x_{1i} + ... + \beta_k x_{ki} \right\}}{1 + \exp\left\{ \beta_0 + \beta_1 x_{1i} + ... + \beta_k x_{ki} \right\}} $$
+
+## Example: Roy Kent's F-Bombs {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## Data Management
+
+```{r}
+richmondway <- richmondway %>%
+  mutate(p_IMDB_0 = exp(-1.76166167 + 0.03323012*F_perc + 0.37986267*0)/(1+exp(-1.76166167 + 0.03323012*F_perc + 0.37986267*0)),
+         p_IMDB_1 = exp(-1.76166167 + 0.03323012*F_perc + 0.37986267*1)/(1+exp(-1.76166167 + 0.03323012*F_perc + 0.37986267*1)))
+```
+
+
+## Resulting Data
+
+```{r}
+#| echo: false
+
+head(richmondway)
+```
+
+## Graph Code
+
+```{r}
+#| eval: false
+richmondway %>% ggplot(aes(x = F_perc, y = dating)) +
+  geom_point() +
+  geom_line(aes(y = p_IMDB_0), color = "black") +
+  geom_line(aes(y = p_IMDB_1), color = "hotpink") +
+  labs(x = "Percent of Episode's F-Bombs from Roy Kent",
+       y = "Probability of Roy and Keeley Dating") +
+  theme_bw()
+```
+
+
+## Graph 
+
+<center>
+```{r}
+#| echo: false
+richmondway %>% ggplot(aes(x = F_perc, y = dating)) +
+  geom_point() +
+  geom_line(aes(y = p_IMDB_0), color = "black") +
+  geom_line(aes(y = p_IMDB_1), color = "hotpink") +
+  labs(x = "Percent of Episode's F-Bombs from Roy Kent",
+       y = "Probability of Roy and Keeley Dating") +
+  theme_bw()
+```
+</center>
+
+:::

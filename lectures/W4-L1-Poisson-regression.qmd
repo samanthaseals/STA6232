@@ -1,0 +1,519 @@
+---
+title: "Poisson Regression"
+subtitle: "Statistics for Data Science II"
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: true
+format: 
+  revealjs:
+    theme: uwf2
+    embed-resources: true
+    slide-number: false
+    width: 1600
+    height: 900
+    df-print: paged
+    html-math-method: katex
+title-slide-attributes:
+    data-background-image: /Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/title.png
+    data-background-size: contain 
+editor: source
+pdf-separate-fragments: true
+fig-align: center
+---
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Suppose we are faced with *count* data.
+
+    - This is discrete data, not continuous.
+
+- Fortunately, the Poisson distribution is appropriate for count data. 
+
+- The Poisson regression model is as follows:
+  
+$$\ln\left( y \right) = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k$$
+
+- Note that this is similar to logistic regression in that we are using the natural log when modeling the outcome. 
+
+## Today's Data {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Today we will be examining [US House election results](https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-11-07/readme.md) from 1976-2022, distributed by Tidy Tuesday.
+
+::: {.panel-tabset}
+
+## Data
+
+```{r}
+#| echo: false
+library(tidyverse)
+library(fastDummies)
+
+house <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-07/house.csv') %>%
+  filter(stage == "GEN" &
+         party %in% c("REPUBLICAN", "DEMOCRAT") &
+         state != "DISTRICT OF COLUMBIA") %>%
+  mutate(candidatevotes = candidatevotes + 1,
+         year10 = year/10,
+         region = if_else(state %in% c("CONNECTICUT", "MAINE", "MASSACHUSETTS", "NEW HAMPSHIRE", "RHODE ISLAND", "VERMONT", "NEW JERSEY", "NEW YORK", "PENNSYLVANIA"), "Northeast",
+                          if_else(state %in% c("ILLINOIS", "INDIANA", "MICHIGAN", "OHIO", "WISCONSIN", "IOWA", "KANSAS", "MINNESOTA", "MISSOURI", "NEBRASKA", "NORTH DAKOTA", "SOUTH DAKOTA"), "Midwest",
+                                  if_else(state %in% c("DELAWARE", "FLORIDA", "GEORGIA", "MARYLAND", "NORTH CAROLINA", "SOUTH CAROLINA", "VIRGINIA","WEST VIRGINIA", "ALABAMA", "KENTUCKY", "MISSISSIPPI", "TENNESSEE", "ARKANSAS", "LOUISIANA", "OKLAHOMA", "TEXAS"), "South", "West")))) %>%
+  dummy_cols(select_columns = c("region"))
+
+head(house)
+```
+
+## Variables of Interest
+
+- **candidatevotes:** votes received by this candidate for this particular party
+
+- **totalvotes:** total number of votes cast for this election
+
+- **year:**	year in which election was held
+
+- **region:** region that state belongs to, as defined by the US Census Bureau
+
+    - I derived this; please examine the code to see how.
+
+## Code
+
+```{r}
+#| eval: false
+library(tidyverse)
+library(fastDummies)
+
+house <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-07/house.csv') %>%
+  filter(stage == "GEN" &
+         party %in% c("REPUBLICAN", "DEMOCRAT") &
+         state != "DISTRICT OF COLUMBIA") %>%
+  mutate(candidatevotes = candidatevotes + 1,
+         year10 = year/10,
+         region = if_else(state %in% c("CONNECTICUT", "MAINE", "MASSACHUSETTS", "NEW HAMPSHIRE", "RHODE ISLAND", "VERMONT", "NEW JERSEY", "NEW YORK", "PENNSYLVANIA"), "Northeast",
+                          if_else(state %in% c("ILLINOIS", "INDIANA", "MICHIGAN", "OHIO", "WISCONSIN", "IOWA", "KANSAS", "MINNESOTA", "MISSOURI", "NEBRASKA", "NORTH DAKOTA", "SOUTH DAKOTA"), "Midwest",
+                                  if_else(state %in% c("DELAWARE", "FLORIDA", "GEORGIA", "MARYLAND", "NORTH CAROLINA", "SOUTH CAROLINA", "VIRGINIA","WEST VIRGINIA", "ALABAMA", "KENTUCKY", "MISSISSIPPI", "TENNESSEE", "ARKANSAS", "LOUISIANA", "OKLAHOMA", "TEXAS"), "South", "West")))) %>%
+  dummy_cols(select_columns = c("region"))
+```
+
+:::
+
+## Data Exploration {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## Box Plot 1
+
+<center>
+```{r}
+#| echo: false
+house %>% 
+  ggplot(aes(y=candidatevotes, x=region)) + 
+  geom_boxplot() +
+  theme_bw()
+```
+</center>
+
+## Box Plot 2
+
+<center>
+```{r}
+#| echo: false
+house %>% 
+  filter(candidatevotes < 450000) %>%
+  ggplot(aes(y=candidatevotes, x=region)) + 
+  geom_boxplot() +
+  theme_bw()
+```
+</center>
+
+## Histogram 1
+
+<center>
+```{r}
+#| echo: false
+house %>% 
+  ggplot(aes(x=candidatevotes)) + 
+  geom_histogram(bins = 45) +
+  theme_bw()
+```
+</center>
+
+## Histogram 2
+
+<center>
+```{r}
+#| echo: false
+house %>% 
+  filter(candidatevotes < 450000) %>%
+  ggplot(aes(x=candidatevotes)) + 
+  geom_histogram(bins = 45) +
+  theme_bw()
+```
+</center>
+
+## Codes
+
+```{r}
+#| eval: false
+house %>% ## BOX PLOT 1 ##
+  ggplot(aes(y=candidatevotes, x=region)) + 
+  geom_boxplot() +
+  theme_bw()
+house %>% ## BOX PLOT 2 ##
+  filter(candidatevotes < 450000) %>%
+  ggplot(aes(y=candidatevotes, x=region)) + 
+  geom_boxplot() +
+  theme_bw()
+house %>% ## HISTOGRAM 1 ##
+  filter(candidatevotes < 450000) %>%
+  ggplot(aes(x=candidatevotes)) + 
+  geom_histogram(bins = 45) +
+  theme_bw()
+house %>% ## HISTOGRAM 2 ##
+  filter(candidatevotes < 450000) %>%
+  ggplot(aes(x=candidatevotes)) + 
+  geom_histogram(bins = 45) +
+  theme_bw()
+```
+
+:::
+
+## R Syntax {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We are able to again use the `glm()` function when specifying the Poisson distribution.
+
+```{r}
+#| eval: false
+m <- glm(outcome ~ var_1 + var_2 + ... + var_k, 
+         family="poisson",
+         data=dataset)
+```
+
+- Everything we have learned about how to use model results applies here as well.
+
+## Example {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's use the election data to model the number of votes received as a function of the year, the region, the interaction between the party and the year, and the interaction between the party and region.
+
+::: {.panel-tabset}
+
+## Code 
+
+```{r}
+#| eval: false
+m <- glm(candidatevotes ~ year10 +  party + region_Midwest + region_Northeast + region_West + 
+           party:year10 + 
+           party:region_Midwest + party:region_Northeast + party:region_West + totalvotes,
+         family = "poisson",
+         data = house)
+summary(m)
+```
+
+- Why did I also include `totalvotes` in the model?
+
+## Results
+
+```{r}
+#| echo: false
+m <- glm(candidatevotes ~ year10 +  party + region_Midwest + region_Northeast + region_West + 
+           party:year10 + 
+           party:region_Midwest + party:region_Northeast + party:region_West + totalvotes,
+         family = "poisson",
+         data = house)
+summary(m)
+```
+
+## Resulting Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+```{r}
+coefficients(m)
+```
+
+$$ 
+\begin{align*}
+\ln(\hat{y}) =& -2.62 + 0.07 \text{ year} - 4.40 \text{ repub.} + 0.11 \text{ midwest} + 0.12 \text{ northeast} + 0.11 \text{ west}  \\
+& + 0.02 (\text{repub. $\times$ year}) \\
+& - 0.06 (\text{repub. $\times$ midwest}) - 0.31 (\text{repub. $\times$ northeast}) - 0.19 (\text{repub. $\times$ west})
+\end{align*}
+$$
+
+:::
+
+## Interpretations {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- In Poisson regression, we convert the $\hat{\beta}_i$ values to incident rate ratios (IRR).
+
+$$\text{IRR}_i = \exp\left\{\hat{\beta}_i\right\}$$ 
+
+- This is a multiplicative effect, like an odds ratio in logistic regression. 
+
+    - An IRR > 1 indicates an increase in the expected count. 
+
+    - An IRR < 1 indicates a decrease in the expected count.
+
+- We also interpret the IRR similar to the odds ratio:
+
+  - For a 1 [unit of predictor] increase in [predictor name], the expected count of [outcome] is multiplied by  $\left[ e^{\hat{\beta}_i} \right]$. 
+  
+  - For a 1 [unit of predictor] increase in [predictor name], the expected count of [outcome] are [increased or decreased] by [100(e$^{\hat{\beta}_i}$-1)\% or 100(1-e$^{\hat{\beta}_i}$)\%].
+
+## Example {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's provide interpretations when *year10* = 198.3 (i.e., 1983).
+
+::: {.panel-tabset}
+
+## IRRs - Republicans
+
+```{r}
+#coef(m)
+exp(0.06885689 + 0.02239381*1) # year10
+exp(0.1111224 - 0.05855104*1) # midwest
+exp(0.1203553 - 0.3096250*1) # northeast
+exp(0.1122048 - 0.1864849*1) # west
+```
+
+## Interpretations - Republicans
+
+- Every year, the expected count of votes increases by 10%.
+
+- Those in the midwest have an expected number of votes that is 1.05 times the votes for those in the south.
+
+    - This is a 5% increase.
+
+- Those in the northeast have an expected number of votes that is 0.83 times the votes for those in the south.
+
+    - This is a 17% decrease.
+
+- Those in the west have an expected number of votes that is 0.93 times the votes for those in the south.
+
+    - This is a 7% decrease.
+
+## IRRs - Democrats
+
+```{r}
+#coef(m)
+exp(0.06885689 + 0.02239381*0) # year10
+exp(0.1111224 - 0.05855104*0) # midwest
+exp(0.1203553 - 0.3096250*0) # northeast
+exp(0.1122048 - 0.1864849*0) # west
+```
+
+## Interpretations - Democrats
+
+- Every year, the expected count of votes increases by 7%.
+
+- Those in the midwest have an expected number of votes that is 1.12 times the votes for those in the south.
+
+    - This is a 12% increase.
+
+- Those in the northeast have an expected number of votes that is 1.13 times the votes for those in the south.
+
+    - This is a 13% increase.
+
+- Those in the west have an expected number of votes that is 1.12 times the votes for those in the south.
+
+    - This is a 12% increase.
+
+:::
+
+## Inference - Confidence Intervals  {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We again find confidence intervals as we did before, using the `confint()` function.
+
+```{r}
+confint(m)
+```
+
+## Inference - Hypothesis Testing  {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We take the same approach to determining significance as before.
+
+- A single term in the model $\to$ `summary()`.
+
+- Multiple terms in the model $\to$ `car::Anova()`.
+
+    - This is *required* for a categorical variable with three or more categories.
+    
+## Example  {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Is the interaction between party and year significant?
+
+```{r}
+summary(m)
+```
+
+- Yes! $p < 0.001$.
+
+## Example  {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Is the interaction between party and region significant?
+
+::: {.panel-tabset}
+
+## Results
+
+```{r}
+#| echo: false
+m2 <- glm(candidatevotes ~ year10 +  party + region + party:year10 + party:region + totalvotes, family = "poisson", data = house)
+car::Anova(m2, type = 3)
+```
+
+- Yes! $p < 0.001$.
+
+## Code
+
+```{r}
+#| eval: false
+m2 <- glm(candidatevotes ~ year10 +  party + region + party:year10 + party:region + totalvotes, family = "poisson", data = house)
+car::Anova(m2, type = 3)
+```
+
+:::
+
+## Data Visualization {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's create a couple of data visualizations. 
+
+    - Hold year constant at 1983.
+    
+    - Let total number of votes vary on the $x$-axis.
+    
+    - Define lines for each region...
+    
+        - and graphs for each politcal party.
+
+## Data Visualization {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+
+::: {.panel-tabset}
+
+## Predicted Values (set up)
+
+```{r}
+# coefficients(m) # get coeff
+
+# create full model before plugging in
+#-2.619027 + 0.06885689*year10 -4.398204*repub + 0.1111224*midwest + 0.1203553*northeast + 0.1122048*west + 0.000001587455*totalvotes + 0.02239381*year10*repub - 0.05855104*midwest*repub - 0.3096250*northeast*repub - 0.1864849*west*repub
+
+# year10 = 1983
+#-2.619027 + 0.06885689*198.3 -4.398204*repub + 0.1111224*midwest + 0.1203553*northeast + 0.1122048*west + 0.000001587455*totalvotes + 0.02239381*198.3*repub - 0.05855104*midwest*repub - 0.3096250*northeast*repub - 0.1864849*west*repub
+
+# republicans
+#-2.619027 + 0.06885689*198.3 -4.398204*1 + 0.1111224*midwest + 0.1203553*northeast + 0.1122048*west + 0.000001587455*totalvotes + 0.02239381*198.3*1 - 0.05855104*midwest*1 - 0.3096250*northeast*1 - 0.1864849*west*1
+
+# democrats
+#-2.619027 + 0.06885689*198.3 -4.398204*0 + 0.1111224*midwest + 0.1203553*northeast + 0.1122048*west + 0.000001587455*totalvotes + 0.02239381*198.3*0 - 0.05855104*midwest*0 - 0.3096250*northeast*0 - 0.1864849*west*0
+```
+
+## Predicted Values
+
+```{r}
+house <- house %>%
+  mutate(r_mw = exp(-2.619027 + 0.06885689*198.3 -4.398204*1 + 0.1111224*1 + 0.1203553*0 + 0.1122048*0 + 0.000001587455*totalvotes + 0.02239381*198.3*1 - 0.05855104*1*1 - 0.3096250*0*1 - 0.1864849*0*1),
+         r_ne = exp(-2.619027 + 0.06885689*198.3 -4.398204*1 + 0.1111224*0 + 0.1203553*1 + 0.1122048*0 + 0.000001587455*totalvotes + 0.02239381*198.3*1 - 0.05855104*0*1 - 0.3096250*1*1 - 0.1864849*0*1),
+         r_w = exp(-2.619027 + 0.06885689*198.3 -4.398204*1 + 0.1111224*0 + 0.1203553*0 + 0.1122048*1 + 0.000001587455*totalvotes + 0.02239381*198.3*1 - 0.05855104*0*1 - 0.3096250*0*1 - 0.1864849*1*1),
+         r_s = exp(-2.619027 + 0.06885689*198.3 -4.398204*1 + 0.1111224*0 + 0.1203553*0 + 0.1122048*0 + 0.000001587455*totalvotes + 0.02239381*198.3*1 - 0.05855104*0*1 - 0.3096250*0*1 - 0.1864849*0*1),
+         d_mw = exp(-2.619027 + 0.06885689*198.3 -4.398204*0 + 0.1111224*1 + 0.1203553*0 + 0.1122048*0 + 0.000001587455*totalvotes + 0.02239381*198.3*0 - 0.05855104*1*0 - 0.3096250*0*0 - 0.1864849*0*0),
+         d_ne = exp(-2.619027 + 0.06885689*198.3 -4.398204*0 + 0.1111224*0 + 0.1203553*1 + 0.1122048*0 + 0.000001587455*totalvotes + 0.02239381*198.3*0 - 0.05855104*0*0 - 0.3096250*1*0 - 0.1864849*0*0),
+         d_w = exp(-2.619027 + 0.06885689*198.3 -4.398204*0 + 0.1111224*0 + 0.1203553*0 + 0.1122048*1 + 0.000001587455*totalvotes + 0.02239381*198.3*0 - 0.05855104*0*0 - 0.3096250*0*0 - 0.1864849*1*0),
+         d_s = exp(-2.619027 + 0.06885689*198.3 -4.398204*0 + 0.1111224*0 + 0.1203553*0 + 0.1122048*0 + 0.000001587455*totalvotes + 0.02239381*198.3*0 - 0.05855104*0*0 - 0.3096250*0*0 - 0.1864849*0*0))
+```
+
+## Graph - Republicans
+
+```{r}
+#| echo: false
+
+house %>% 
+  ggplot(aes(x = totalvotes, y = candidatevotes)) +
+  geom_point() + 
+  geom_line(aes(y = r_ne), color = "pink") + 
+  geom_line(aes(y = r_s), color = "hotpink") + 
+  geom_line(aes(y = r_mw), color = "purple") + 
+  geom_line(aes(y = r_w), color = "lightblue") +
+  theme_bw()
+```
+
+## Graph - Democrats
+
+```{r}
+#| echo: false
+
+house %>% 
+  ggplot(aes(x = totalvotes, y = candidatevotes)) +
+  geom_point() + 
+  geom_line(aes(y = d_ne), color = "pink") + 
+  geom_line(aes(y = d_s), color = "hotpink") + 
+  geom_line(aes(y = d_mw), color = "purple") + 
+  geom_line(aes(y = d_w), color = "lightblue") +
+  theme_bw()
+```
+
+## Codes
+
+```{r}
+#| eval: false
+
+# republicans
+house %>% 
+  ggplot(aes(x = totalvotes, y = candidatevotes)) +
+  geom_point() + 
+  geom_line(aes(y = r_ne), color = "pink") + 
+  geom_line(aes(y = r_s), color = "hotpink") + 
+  geom_line(aes(y = r_mw), color = "purple") + 
+  geom_line(aes(y = r_w), color = "lightblue") +
+  theme_bw()
+
+# democrats
+house %>% 
+  ggplot(aes(x = totalvotes, y = candidatevotes)) +
+  geom_point() + 
+  geom_line(aes(y = d_ne), color = "pink") + 
+  geom_line(aes(y = d_s), color = "hotpink") + 
+  geom_line(aes(y = d_mw), color = "purple") + 
+  geom_line(aes(y = d_w), color = "lightblue") +
+  theme_bw()
+```
+
+:::
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

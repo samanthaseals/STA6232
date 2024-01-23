@@ -142,7 +142,7 @@ summary(m1)
 ## `play_hours` $\times$ `play_home` (oops)
 
 ```{r}
-tail(car::Anova(m1))
+tail(car::Anova(m1, type = 3))
 # NOTE! I am using tail() because the results run off of the slide
 # You do not need to use the tail() function in your project
 ```
@@ -156,7 +156,7 @@ m2 <- lm(average ~ year2013 + play_home + as.factor(play_hours) +
                    play_home:as.factor(play_hours), # interaction between play_home and play_hours
          data = analytic) 
 
-car::Anova(m2)
+car::Anova(m2, type = 3)
 ```
 
 :::
@@ -170,7 +170,7 @@ car::Anova(m2)
     
 - **Test Statistic and *p*-Value**
 
-    - $t_0 = 9.63$
+    - $F_0 = 6.06$
     - $p < 0.001$
     
 - **Rejection Region**    

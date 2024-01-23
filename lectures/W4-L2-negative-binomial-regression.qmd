@@ -1,0 +1,351 @@
+---
+title: "Negative Binomial Regression"
+subtitle: "Statistics for Data Science II"
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: true
+format: 
+  revealjs:
+    theme: uwf2
+    embed-resources: true
+    slide-number: false
+    width: 1600
+    height: 900
+    df-print: paged
+    html-math-method: katex
+title-slide-attributes:
+    data-background-image: /Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/title.png
+    data-background-size: contain 
+editor: source
+pdf-separate-fragments: true
+fig-align: center
+---
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Recall the Poisson regression model:
+  
+$$\ln\left( y \right) = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k$$
+
+- Today, we will discuss an assumption of the Poisson distribution, and what to do if we break that assumption.
+
+## Today's Data {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Today we will again be examining [US House election results](https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-11-07/readme.md) from 1976-2022, distributed by Tidy Tuesday.
+
+::: {.panel-tabset}
+
+## Data
+
+```{r}
+#| echo: false
+library(tidyverse)
+library(fastDummies)
+
+house <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-07/house.csv') %>%
+  filter(stage == "GEN" &
+         party %in% c("REPUBLICAN", "DEMOCRAT") &
+         state != "DISTRICT OF COLUMBIA") %>%
+  mutate(candidatevotes = candidatevotes + 1,
+         year10 = year/10,
+         region = if_else(state %in% c("CONNECTICUT", "MAINE", "MASSACHUSETTS", "NEW HAMPSHIRE", "RHODE ISLAND", "VERMONT", "NEW JERSEY", "NEW YORK", "PENNSYLVANIA"), "Northeast",
+                          if_else(state %in% c("ILLINOIS", "INDIANA", "MICHIGAN", "OHIO", "WISCONSIN", "IOWA", "KANSAS", "MINNESOTA", "MISSOURI", "NEBRASKA", "NORTH DAKOTA", "SOUTH DAKOTA"), "Midwest",
+                                  if_else(state %in% c("DELAWARE", "FLORIDA", "GEORGIA", "MARYLAND", "NORTH CAROLINA", "SOUTH CAROLINA", "VIRGINIA","WEST VIRGINIA", "ALABAMA", "KENTUCKY", "MISSISSIPPI", "TENNESSEE", "ARKANSAS", "LOUISIANA", "OKLAHOMA", "TEXAS"), "South", "West")))) %>%
+  dummy_cols(select_columns = c("region"))
+
+head(house)
+```
+
+## Variables of Interest
+
+- **candidatevotes:** votes received by this candidate for this particular party
+
+- **totalvotes:** total number of votes cast for this election
+
+- **year:**	year in which election was held
+
+- **region:** region that state belongs to, as defined by the US Census Bureau
+
+    - I derived this; please examine the code to see how.
+
+## Code
+
+```{r}
+#| eval: false
+library(tidyverse)
+library(fastDummies)
+
+house <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-07/house.csv') %>%
+  filter(stage == "GEN" &
+         party %in% c("REPUBLICAN", "DEMOCRAT") &
+         state != "DISTRICT OF COLUMBIA") %>%
+  mutate(candidatevotes = candidatevotes + 1,
+         year10 = year/10,
+         region = if_else(state %in% c("CONNECTICUT", "MAINE", "MASSACHUSETTS", "NEW HAMPSHIRE", "RHODE ISLAND", "VERMONT", "NEW JERSEY", "NEW YORK", "PENNSYLVANIA"), "Northeast",
+                          if_else(state %in% c("ILLINOIS", "INDIANA", "MICHIGAN", "OHIO", "WISCONSIN", "IOWA", "KANSAS", "MINNESOTA", "MISSOURI", "NEBRASKA", "NORTH DAKOTA", "SOUTH DAKOTA"), "Midwest",
+                                  if_else(state %in% c("DELAWARE", "FLORIDA", "GEORGIA", "MARYLAND", "NORTH CAROLINA", "SOUTH CAROLINA", "VIRGINIA","WEST VIRGINIA", "ALABAMA", "KENTUCKY", "MISSISSIPPI", "TENNESSEE", "ARKANSAS", "LOUISIANA", "OKLAHOMA", "TEXAS"), "South", "West")))) %>%
+  dummy_cols(select_columns = c("region"))
+```
+
+:::
+
+## Poisson Distribution {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- The Poisson probability mass function is as follows:
+  
+$$f(y; \lambda) = \frac{\lambda^y e^{-\lambda}}{y!},$$
+
+- where $k$ is the count ($k \in \mathbb{Z}^+$).
+
+- A requirement of this distribution is that the mean ($\lambda$) equals the variance ($\lambda$).
+    
+- To check this, we just find the mean and variance of the count outcome we are looking at.
+
+
+## Example {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's check the mean and variance of our outcome, *candidatevotes*.
+
+```{r}
+house %>% summarize(mean(candidatevotes), var(candidatevotes))
+```
+
+<center>😱</center>
+
+- Poisson regression should definitely not be used!
+
+## Negative Binomial Regression {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let us now consider negative binomial regression:
+  
+$$\ln\left( y \right) = \beta_0 + \beta_1 x_1 + ... + \beta_k x_k$$
+
+- What is different? The underlying distribution.
+
+- We now are applying the negative binomial distribution:
+
+$$f(y; r, p) = {y + r -1 \choose y-1} (1-p)^y p^r$$
+
+- where $r$ is the number of successes and $p$ is the probability of success.
+
+## Negative Binomial Regression {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Why does the negative binomial handle overdispersed data better?
+
+- The variance is as follows,
+
+$$\text{var}[Y] = \mu + \frac{\mu^2}{k},$$
+
+- Here, $k$ is an additional parameter, called the dispersion parameter.
+
+- As $k \to \infty$, $\text{nb}(r, p) \to \text{Poi}(\lambda)$.
+
+    - That is, as the dispersion parameter increases, the negative binomial *converges in distribution* to the Poisson.
+
+- What does this mean for us?
+
+    - If we apply the negative binomial when the Poisson was appropriate, *we will get the same results*.
+    
+## Negative Binomial Regression {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Why do we care if the data is overdispersed?
+
+    - When data is overdispersed, we know that the standard error is underestimated. 
+
+- Let's think about how test statistics are created:
+
+$$z_i = \frac{\hat{\beta}_i}{\text{SE}_{\hat{\beta}_i}}$$
+
+- As the standard error reduces, our test statistic increases.
+
+- As our test statistic increases, our $p$-value decreases.
+
+- **We are inflating the type I error rate when applying the Poisson to overdispersed data!**
+
+## R Syntax {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We now will use the `glm.nb()` function from the `MASS` package when specifying the negative binomial distribution.
+
+    - !! WARNING !! the `MASS` package will overwrite the `select()` function from `dplyr` (`tidyverse`).
+    
+    - I prefer to call it using `MASS::glm.nb()` rather than calling the `MASS` package into R.
+
+```{r}
+#| eval: false
+m <- MASS:glm.nb(outcome ~ var_1 + var_2 + ... + var_k, 
+            data=dataset)
+```
+
+- Note that we do not need to specify the distribution *inside* the function!
+
+    - This function is *only* for negative binomial.
+
+## Example {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let's reproduce the example from the Poisson lecture. 
+
+- We will use the election data to model the number of votes received as a function of the year, the region, the interaction between the party and the year, and the interaction between the party and region.
+
+::: {.panel-tabset}
+
+## Code 
+
+```{r}
+#| eval: false
+m <- MASS::glm.nb(candidatevotes ~ year10 +  party + region_Midwest + region_Northeast + region_West + 
+           party:year10 + 
+           party:region_Midwest + party:region_Northeast + party:region_West + totalvotes,
+         data = house)
+summary(m)
+```
+
+
+
+## Results
+
+```{r}
+#| echo: false
+m <- MASS::glm.nb(candidatevotes ~ year10 +  party + region_Midwest + region_Northeast + region_West + 
+           party:year10 + 
+           party:region_Midwest + party:region_Northeast + party:region_West + totalvotes,
+         data = house)
+summary(m)
+```
+
+## Resulting Model {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+$$ 
+\begin{align*}
+\ln(\hat{y}) =& 16.11 - 0.03 \text{ year} - 6.22 \text{ repub.} + 0.03 \text{ midwest} + 0.09 \text{ northeast} + 0.07 \text{ west}  \\
+& + 0.03 (\text{repub. $\times$ year}) \\
+& - 0.04 (\text{repub. $\times$ midwest}) - 0.28 (\text{repub. $\times$ northeast}) - 0.16 (\text{repub. $\times$ west})
+\end{align*}
+$$
+
+:::
+
+## Inference - Confidence Intervals  {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We again find confidence intervals as we did before, using the `confint()` function.
+
+```{r}
+confint(m)
+```
+
+## Inference - Hypothesis Testing  {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We take the same approach to determining significance as before.
+
+- A single term in the model $\to$ `summary()`.
+
+- Multiple terms in the model $\to$ `car::Anova()`.
+
+    - This is *required* for a categorical variable with three or more categories.
+    
+## Example  {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Is the interaction between party and year significant?
+
+```{r}
+summary(m)
+```
+
+- Yes! $p < 0.001$.
+
+## Example  {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Is the interaction between party and region significant?
+
+::: {.panel-tabset}
+
+## Results
+
+```{r}
+#| echo: false
+m2 <- MASS::glm.nb(candidatevotes ~ year10 +  party + region + party:year10 + party:region + totalvotes, data = house)
+car::Anova(m2, type = 3)
+```
+
+- Yes! $p < 0.001$.
+
+## Code
+
+```{r}
+#| eval: false
+m2 <- MASS::glm.nb(candidatevotes ~ year10 +  party + region + party:year10 + party:region + totalvotes, data = house)
+car::Anova(m2, type = 3)
+```
+
+:::
+
+## Comparison {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Poisson model:
+
+$$ 
+\begin{align*}
+\ln(\hat{y}) =& -2.62 + 0.07 \text{ year} - 4.40 \text{ repub.} + 0.11 \text{ midwest} + 0.12 \text{ northeast} + 0.11 \text{ west}  \\
+& + 0.02 (\text{repub. $\times$ year}) \\
+& - 0.06 (\text{repub. $\times$ midwest}) - 0.31 (\text{repub. $\times$ northeast}) - 0.19 (\text{repub. $\times$ west})
+\end{align*}
+$$
+
+- Negative binomial model:
+
+$$ 
+\begin{align*}
+\ln(\hat{y}) =& 16.11 - 0.03 \text{ year} - 6.22 \text{ repub.} + 0.03 \text{ midwest} + 0.09 \text{ northeast} + 0.07 \text{ west}  \\
+& + 0.03 (\text{repub. $\times$ year}) \\
+& - 0.04 (\text{repub. $\times$ midwest}) - 0.28 (\text{repub. $\times$ northeast}) - 0.16 (\text{repub. $\times$ west})
+\end{align*}
+$$
+
+## Wrap Up {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We now have learned modeling for count data.
+
+    - Mean = variance $\to$ Poisson.
+    
+    - Mean >>> variance $\to$ negative binomial.
+
+- Note that there is a method to handle excessive zeros in the model: zero-inflated Poisson (ZIP) and zero-inflated negative binomial (ZINB).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
