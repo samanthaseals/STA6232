@@ -1,0 +1,321 @@
+---
+title: "Cross Validation"
+subtitle: "Statistics for Data Science II"
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: true
+format: 
+  revealjs:
+    theme: uwf2
+    embed-resources: true
+    slide-number: false
+    width: 1600
+    height: 900
+    df-print: paged
+    html-math-method: katex
+title-slide-attributes:
+    data-background-image: /Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/title.png
+    data-background-size: contain 
+editor: source
+pdf-separate-fragments: true
+fig-align: center
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(palmerpenguins)
+library(tidymodels)
+library(boot)
+data <- palmerpenguins::penguins %>% na.omit()
+```
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We are often interested in how well our model performs with "real" data.
+
+- We cannot truly determine the performance of the model with data used to construct the model as this data is considered *biased*.
+
+- In this lecture, we will learn about the validation set approach, leave-one-out cross-validation, and $k$-fold cross-validation. 
+
+- Consider the penguin dataset as a basic example. Let us consider modeling penguin body mass (g) as a function of flipper length (mm).
+
+    - M1: body mass $\sim$ flipper
+
+    - M2: body mass $\sim$ flipper + flipper$^2$
+
+## Introduction {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## body mass $\sim$ flipper
+
+```{r}
+m1 <- glm(body_mass_g ~ flipper_length_mm, data = data)
+summary(m1)
+``` 
+
+## body mass $\sim$ flipper + flipper$^2$
+
+```{r}
+data <- data %>% mutate(flipper2 = flipper_length_mm^2)
+m2 <- glm(body_mass_g ~ flipper_length_mm + flipper2, data = data)
+summary(m2)
+```
+
+:::
+
+## Validation Set Approach {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Cross validation starts by splitting data into training and validation datasets.
+
+<center><img src="images/W6-L1-a.png"></center>
+
+- We will use:
+
+    - the training data to construct the model
+
+    - the validation data to determine how good the prediction of the model is.
+
+- Why do we need a separate (validation) dataset? 
+
+    - We need to use data that was *not* used to create the model. (i.e., unbiased data)
+
+
+## Validation Set Approach {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We will use the mean square error (MSE) to assess how well the model performs.
+
+    - squared error = $(y_i - \hat{y}_i)^2$
+
+    - MSE = average of squared error for all observations in the validation set
+
+- We should construct multiple training and validation sets.
+
+  - When we construct multiple models, we will choose the model with the lowest MSE.
+
+- We will use the `tidymodels` package to split the data.
+
+## Validation Set Approach {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## create data
+```{r}
+data <- data %>%
+  mutate(obs = row_number()) %>%
+  relocate(obs)
+head(data)
+```
+
+## split data
+
+```{r}
+set.seed(906282) # reproducible sampling
+split <- initial_split(data, prop = 0.5)
+training <- training(split)
+validation <- testing(split)
+```
+
+## check
+
+```{r}
+head(training)
+```
+
+:::
+
+## Validation Set Approach {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Now, we will construct our models using the training dataset.
+
+```{r}
+m1v <- lm(body_mass_g ~ flipper_length_mm, data = training)
+m2v <- lm(body_mass_g ~ flipper_length_mm + flipper2, data = training)
+```
+
+- We now need to compute the MSE for each model using the validation dataset.
+
+    - First, we will set up the squared errors, $(y_i - \hat{y}_i)^2$, under each model.
+    
+    - Then, we take the average of the squared error to find the MSE for each model.
+
+## Validation Set Approach {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+::: {.panel-tabset}
+
+## code 
+```{r}
+validation <- validation %>% 
+  mutate(yhat_m1 = predict(m1v, newdata = validation),
+         yhat_m2 = predict(m2v, newdata = validation)) %>%
+  mutate(sqerr_m1 = (yhat_m1 - body_mass_g)^2,
+         sqerr_m2 = (yhat_m2 - body_mass_g)^2) %>%
+  relocate(obs, body_mass_g, yhat_m1, sqerr_m1, yhat_m2, sqerr_m2)
+```
+
+## result
+```{r}
+head(validation)
+```
+:::
+
+## Validation Set Approach {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Looking at the MSE,
+
+```{r}
+mean(validation$sqerr_m1, na.rm = TRUE)
+mean(validation$sqerr_m2, na.rm = TRUE)
+```
+
+- Of the two candidate models, the model including the quadratic term (M2) gives the lowest MSE.
+
+
+## Leave-One-Out Cross-Validation {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- The leave-one-out cross-validation is similar to what we discussed under the validation set approach.
+
+- We now leave out a single observation.
+
+<center><img src = "images/W6-L1-b.png"></center>
+
+## Leave-One-Out Cross-Validation {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- As we are only excluding a single observation, we now have $n$ MSEs to consider.
+$$ \text{MSE}_i = (y_i - \hat{y}_i)^2 $$
+
+- Because the MSE is now based on a single observation, the variability is high.
+
+- Thus, we then consider the leave-one-out cross-validation estimate for the test MSE,
+$$ \text{CV}_{(n)} = \frac{\sum_{i=1}^n \text{MSE}_i}{n}  $$
+
+- These are useful when considering various models in terms of what is being included as predictors (e.g., higher order polynomial terms).
+
+## Leave-One-Out Cross-Validation {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Note that as $n$ increases *and* as the model complexity increases, it will be computationally intensive/expensive to implement this method.
+
+- If using least squares regression, we can use the following estimate:
+$$ \text{CV}_{(n)} = \frac{1}{n} \sum_{i=1}^n \left( \frac{y_i - \hat{y}_i}{1-h_i} \right)^2, $$
+
+- where $h_i$ is the leverage as defined in the lecture on model assumptions and diagnostics.
+
+## Leave-One-Out Cross-Validation {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- In our example,
+
+```{r}
+set.seed(6714)
+m1 <- glm(body_mass_g ~ flipper_length_mm, data = data)
+cv.glm(data, m1)$delta
+set.seed(19571)
+m2 <- glm(body_mass_g ~ flipper_length_mm + flipper2, data = data)
+cv.glm(data, m2)$delta
+```
+
+- The first value is the estimated CV$_{(n)}$ while the second value is the true CV$_{(n)}$.
+
+- The model with the quadratic term has a lower test CV$_{(n)}$, thus, fits better.
+
+## $k$-Fold Cross-Validation {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- An alternative to leave-one-out cross-validation is the $k$-fold cross-validation. 
+
+- Instead of leaving a single observation out, we now leave a group of observations out.
+
+<center><img src = "images/W6-L1-c.png"></center>
+
+## $k$-Fold Cross-Validation {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- We are dividing the dataset into $k$ groups (or folds) of approximately equal size.
+
+    - We treat the first group as the validation set.
+    - The other $k-1$ groups are used to construct the model.
+    - Then, we compute the MSE on the first group.
+
+- We repeat this process $k$ times, giving us $k$ estimates of the test error. 
+
+- We construct CV$_{(k)}$ as the average MSE,
+$$\text{CV}_{(k)} = \frac{\sum_{i=1}^k \text{MSE}_i}{k}$$
+
+- Note that leave-one-out cross-validation is a special case of $k$-fold cross-validation, where $k=n$.
+
+## $k$-Fold Cross-Validation {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Suppose we are interested in 10-fold validation.
+
+- In our example,
+
+```{r}
+set.seed(75628)
+m1 <- glm(body_mass_g ~ flipper_length_mm, data = data)
+cv.glm(data, m1, K=10)$delta
+set.seed(24681)
+m2 <- glm(body_mass_g ~ flipper_length_mm + flipper2, data = data)
+cv.glm(data, m2, K=10)$delta
+```
+
+- The first value is the estimated CV$_{(k)}$ while the second value is the true CV$_{(k)}$. 
+
+- The values above indicate that the model with the quadratic term offers a better fit.
+
+## Cross-Validation in Classification Problems {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- What if we are working with categorical data and using logistic regression?
+
+- Instead of calculating a CV$_{(n)}$ based on the MSE, we will now base it on the number of misclassified observations.
+$$\text{CV}_{(n)} = \frac{\sum_{i=1}^n \text{Err}_i}{n}, $$
+
+- where Err$_i = I(y_i \ne \hat{y}_i)$. (i.e., is the count of the number of misclassifications.)
+
+- We will again use the `glm()` function for modeling and then employ the `cv.glm()` function for cross-validation.
+
+## Cross-Validation in Classification Problems {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Consider the following example: A researcher is interested in how student characteristics affect admission into graduate school. We are interested in modeling the graduate school admission as a function of GRE, college GPA, and prestige of the undergraduate institution.
+
+```{r}
+library(gsheet)
+data <- gsheet2tbl("https://docs.google.com/spreadsheets/d/1fCIhZTf4BnE_Xly4zp8Cg_cz4wAYrQN0WPN9vDnqSEE/edit#gid=0")
+head(data, n = 3)
+```
+
+## Cross-Validation in Classification Problems {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let us compare models with/without the prestige of the undergraduate institution predictor using leave-one-out cross-validation:
+
+```{r}
+set.seed(65730)
+m1 <- glm(admit ~ gre + gpa + rank, data = data, family = "binomial")
+cv.glm(data, m1)$delta
+set.seed(162267)
+m2 <- glm(admit ~ gre + gpa, data = data, family = "binomial")
+cv.glm(data, m2)$delta
+```
+
+- Which model fits better? Why?
+
+## Cross-Validation in Classification Problems {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Let us repeat the last example under 10-fold cross-validation:
+
+```{r}
+set.seed(999)
+cv.glm(data, m1, K=10)$delta
+set.seed(7816)
+cv.glm(data, m2, K=10)$delta
+```
+
+- Which model fits better? Why?
+
+## Conclusion {background-image="/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/00 - Personal/R/quarto themes/slide.png" background-size="contain"} 
+
+- Cross-validation is another tool in our toolbox for quantifying the error in our models.
+
+    - When we use it to compare several candidate models, we can quantify that reduction in error.
+
+- While our examples showed that specific models fit better, it could be the case that the reduction is very small.
+
+    - It may not be "worth" a more complicated model for a small reduction in error.
