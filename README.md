@@ -14,4 +14,4 @@ This is the repository for STA4231 and STA6232 - Statistics for Data Science II.
 |   | Nominal Logistic Regression | [raw qmd](https://github.com/samanthaseals/STA6232/blob/main/lectures/W3-L3-nominal-logistic-regression.qmd)
 | 5 | Poisson Regression | [raw qmd](https://github.com/samanthaseals/STA6232/blob/main/lectures/W4-L1-poisson-regression.qmd)
 |   | Negative Binomial Regression | [raw qmd](https://github.com/samanthaseals/STA6232/blob/main/lectures/W4-L2-negative-binomial-regression.qmd)
-| 6 | Choosing the Right Distribution
+| 6 | Choosing the Right Distribution | [raw qmd](https://github.com/samanthaseals/STA6232/blob/main/lectures/W6%20-%20exploring%20data.qmd)
