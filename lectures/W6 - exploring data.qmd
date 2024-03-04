@@ -1,0 +1,251 @@
+---
+title: "STA6232: Week 6 - Exploring Data"
+editor: source
+format:
+  html:
+    self-contained: true
+always_allow_html: true
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: true
+from: markdown+emoji
+---
+
+# Introduction
+
+This week, we will learn how to properly explore data to determine what distribution is appropriate when modeling an outcome.
+
+I keep a "road map" in my mind:
+
+  - Continuous? Try normal first.
+  - Categorical? One of the logistics
+  - Count? Poisson or negative binomial
+    
+But, sometimes I need to "look" at the data to make sure. 
+
+  - Continuous data does not always lend itself to the normal distribution. Sometimes it needs a transformation. We can do a preliminary check on the outcome (*y*) to determine shape of distribution, but remember that the assumptions with normal distribution is on the residuals - so we need to check those assumptions on the backend as well.
+  
+  - Categorical data needs to be explored to make sure that there is not sparseness in a category. We also need to determine if it makes sense to try ordinal logistic regression or stick with nominal logistic regression.
+  
+  - Count data needs to be explored to verify that it is a count, determine if we should use either Poisson or negative binomial, and determine if we should consider a zero-inflated model. 
+    
+We will go through all of the datasets from the projects and explore the outcomes to demonstrate why each distribution was appropriate. When working on projects, it is "obvious" as to what distribution should be used because either (1) you are told what to apply, (2) you know what we covered that week.
+
+Recall that we have been working with the Jackson Heart data,
+
+```{r}
+library(tidyverse)
+library(haven)
+data <- read_sas("/Users/sseals/Library/CloudStorage/GoogleDrive-sseals@uwf.edu/My Drive/STA6232 SDS II/0-data/analysis1.sas7bdat") 
+head(data)
+```
+
+# Projects 1 and 2: systolic blood pressure
+
+In project 1, we modeled systolic blood pressure. Systolic and diastolic blood pressures are "known" to have normal distributions, however, it is still important for us to check.
+
+If I think that a variable may be continuous, I will first look at a histogram of it to see what its shape is. Note that the histogram will also allow us to identify any obvious outliers (e.g., sometimes folks code missing values as 777, 888, or 999 -- sometimes they use 999 for general missing, other times the different large numbers are used to indicate what type of missingness (refused to answer, couldn't remember, or was left blank)).
+
+```{r}
+hist(data$sbp)
+```
+
+There is slight skew to systolic blood pressure, however, I will proceed with the model and then check my assumptions. We can also see that there are no "weird" values in the dataset.
+
+Suppose we create a basic model (for example purposes),
+
+```{r}
+m1 <- glm(sbp ~ age + sex + age:sex, data = data)
+summary(m1)
+```
+
+Let's now check the model assumptions. Remember, when using the normal distribution, we assume that the *residuals* have a normal distribution with mean 0 and common variance.
+
+```{r}
+library(classpackage)
+anova_check(m1)
+```
+
+We can see that there is not an obvious pattern in the scatterplot (assessing variance) and both the histogram and q-q plot look okay. Thus, it is okay to apply the normal distribution to this model.
+
+# Project 3: diabetic status
+
+In this project, we modeled diabetic status (*Diabetes*; 0=non-diabetic, 1=diabetic). When I am first discussing research questions with others, I iron out specifically how outcomes are measured. In this case, it is a yes/no response, so I know that binary logistic regression is appropriate.
+
+When working with categorical data, I look at frequency tables. If I need a quick look at frequencies, I use the `count()` function:
+
+```{r}
+data %>% count(Diabetes)
+```
+
+Another option is the [`gmodels` package](https://www.rdocumentation.org/packages/gmodels/versions/2.18.1.1), which has the [`CrossTable()` function](https://www.rdocumentation.org/packages/gmodels/versions/2.18.1.1/topics/CrossTable). This function is similar to PROC FREQ in SAS - although we did not cover it in this course, contingency table analysis can be performed with this function. 
+
+```{r}
+library(gmodels)
+CrossTable(data$Diabetes)
+```
+
+As we can see, a down side of using the `CrossTable()` function is that it does not include missing observations, while the `count()` function does... but the `count()` function does not provide proportions. Note that if we are reporting proportions (or percentages), it is important to include missing values in the total sample size (the denominator of the proportion). 
+
+Anyhow, these tables have confirmed that there are only two options for diabetic status. They are also already coded 0/1, so we do not need to do any data management. 
+
+# Project 4: diabetic status (again)
+
+In this project, we again modeled diabetic status, but now looking at the 3-level categorical version (*diab3cat*; 0=non-diabetic, 1=pre-diabetic, 2=diabetic). Using the same method as before, we will confirm the categories and eyeball sample sizes. Sometimes there are too few observations in a category and we have to decide to either exclude them from analysis or combine them with another category (if that makes practical sense).
+
+```{r}
+data %>% count(diab3cat)
+CrossTable(data$diab3cat)
+```
+
+# Project 5: number of risk factors
+
+For this project, you had to do some data management. :innocent: You were asked to create a variable that counts the number of controllable risk factors for stroke: 
+
+  - blood pressure (*idealHealthBP*; 1=ideal health, 0=not ideal health), 
+  - smoking status (*idealHealthSMK*; 1=ideal health, 0=not ideal health), 
+  - diabetes (*idealHealthDM*; 1=ideal health, 0=not ideal health), 
+  - diet  (*idealHealthNutrition*; 1=ideal health, 0=not ideal health), 
+  - physical activity (*idealHealthPA*; 1=ideal health, 0=not ideal health), 
+  - obesity  (*idealHealthBMI*; 1=ideal health, 0=not ideal health), and 
+  - high cholesterol  (*idealHealthChol*; 1=ideal health, 0=not ideal health).
+
+```{r}
+data <- data %>%
+  mutate(LSS = 7 - 
+           idealHealthBP - 
+           idealHealthSMK - 
+           idealHealthDM - 
+           idealHealthNutrition - 
+           idealHealthPA - 
+           idealHealthBMI - 
+           idealHealthChol)
+```
+
+I called the variable LSS because this is from the American Heart Association's [Life's Simple 7](https://playbook.heart.org/lifes-simple-7/).
+
+Because the variable itself is the "number of" something, I know it is a count variable. However, we can verify this with a frequency table.
+
+```{r}
+data %>% count(LSS)
+CrossTable(data$LSS)
+```
+
+With count data, we also need to consider zero-inflation. We can see from the frequency chart that we do not have any 0 values at all, so that is not a concern. However, suppose we do have 0 values, then we can look at a histogram to see if there's a spike:
+
+```{r}
+hist(data$LSS)
+```
+
+# What if I'm not sure?
+
+If you are in doubt about distribution, throw the variable in question in a `hist()` -- if it is not a continuous variable, it will be obvious. We've already looked at the histograms for systolic blood pressure and the number of stroke risk factors. For diabetic status,
+
+```{r}
+hist(data$Diabetes)
+hist(data$diab3cat)
+```
+
+Neither variable is continuous as evidenced by the "bar chart" appearance.
+
+# Additional exploration
+
+What if we suspect the distribution is very skewed due to a single high value? I will look at subsets of the data. For example, consider the number of alcoholic drinks per week (*alcw*), 
+
+```{r}
+summary(data$alcw)
+```
+
+I suspect that there's an excessive number of 0's because the minimum, 25th percentile, *and* 50th percentiles are 0. That tells me that at least half of the data is made up of 0 values!
+
+```{r}
+hist(data$alcw)
+```
+
+The histogram also shows a potential outlier or extreme value.
+
+To narrow in, let's first see how many observations have a 0 value.
+
+```{r}
+data %>% filter(alcw == 0) %>% count(alcw)
+```
+
+Thus, we can see that there are 1417 participants that drink 0 alcoholic drinks per week.
+
+Let's explore the non-zero values,
+
+```{r}
+test <- data %>% filter(alcw > 0)
+hist(test$alcw)
+```
+
+Hm, there is still a spike at 0. Let's look at the summary,
+
+```{r}
+summary(test$alcw)
+```
+
+So, we can see that many participants drink on occasion, but not really weekly. Since this is presented as continuous data, let's round to whole numbers using conventional rounding rules. 
+
+(Side note: as the person who created this variable for the JHS, I know the history -- the questionnaire allowed participants to answer in whatever units were accurate for them -- so someone could say that they drank X number of drinks daily, weekly, monthly, or yearly. If you were the analyst looking at this project, you would want to dig into the definitions/formulas used.)
+
+```{r}
+test <- test %>% 
+  mutate(alcw_int = round(alcw))
+hist(test$alcw_int)
+```
+
+Again, let's count the 0 values:
+
+```{r}
+test %>% filter(alcw_int == 0) %>% count(alcw_int)
+```
+Another 557 participants don't drink enough to say that they have more than half a drink every week. That brings our total to 1417 + 557 = `r 1417+557`. That is `r 1417+557` / `r nrow(data)`, or `r round(100*(1417+557)/nrow(data),2)`% of the participants that have less than 0.5 drinks per week.
+
+Let's drill down one more time to look at those that do drink at least half a drink every week.
+
+```{r}
+test2 <- test %>% filter(alcw_int > 0)
+hist(test2$alcw_int)
+```
+
+Now we're getting somewhere. Now that the data is discrete (because we rounded to integers), let's do a frequency table just to see what the responses are.
+
+```{r}
+print(test2 %>% count(alcw_int), n=25)
+```
+
+Interestingly, there is a cluster of folks saying they drink 42 drinks per week. Well... 42 / 7 = 6... they drink a six-pack a day. We can see that the vast majority of participants are not "heavy drinkers" as the frequencies start dwindling after 21 drinks per week (or 3 per day).
+
+Personally, I would apply a zero-inflated model here. (Side note: again, as someone who worked with this data at the JHS... there is a variable that indicates if a participant drinks or not, *alc*. I would definitely use that in the logistic part of the zero-inflated model!)
+
+```{r}
+data <- data %>%
+  mutate(alcw_int = round(alcw))
+data %>% summarize(mean = mean(alcw_int, na.rm = TRUE),
+                   var = var(alcw_int, na.rm = TRUE))
+```
+
+Because the variance >>> the mean, we should use the zero-inflated negative binomial here. 
+
+# Conclusion
+
+This week, we are going to practice determining what distribution is necessary. Remember that we have only learned the following models:
+
+- Normal (remember to check assumptions on residuals)
+- Binary logistic
+- Ordinal logistic (remember to check for proportional odds)
+- Nominal logistic 
+- Poisson (remember to check $\bar{x} \approx s^2$; remember to check for zero-inflation)
+- Negative binomial (remember to check for zero-inflation)
+
+I often say that I spend more time doing data management and investigation than I do actually analyzing the data. I also say that statisticians/data scientists are often more detectives than anything. While generally I don't need to know the science behind the things I'm analyzing, the better I understand basic concepts about the data, the better my modeling strategy becomes. 
+
+That being said, do not be afraid to ask questions of those that are giving you data or are responsible for data creation/collection. In the best scenarios, there will be data dictionaries available. In the worst scenarios, there will be no answers to your questions. In all scenarios, you just do the best with what you have and keep notes / report on whatever assumptions are being made on the data for modeling purposes.
+
+
+
+
+
